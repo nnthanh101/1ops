@@ -1,14 +1,14 @@
 {
-  "name": "operations-enterprise",
+  "name": "1ops",
   "version": "0.1.0",
-  "description": "1xOps Operations Enterprise: enterprise add-on built on Anthropic's operations plugin. Connector-verified, evidence-cited, approval-gated playbooks on real assets.",
+  "description": "1ops: enterprise operations add-on for Claude, built on Anthropic's operations plugin. Connector-verified, evidence-cited, approval-gated playbooks on real assets.",
   "author": {
     "name": "Nhat-Thanh Nguyen",
     "email": "nnthanh101@gmail.com",
     "url": "https://github.com/1xOps"
   },
-  "homepage": "https://github.com/1xOps/operations-enterprise",
-  "repository": "https://github.com/1xOps/operations-enterprise",
+  "homepage": "https://github.com/1xOps/1ops",
+  "repository": "https://github.com/1xOps/1ops",
   "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "operations",

@@ -1,17 +1,17 @@
 {
-  "name": "1xops",
+  "name": "1ops",
   "owner": {
     "name": "Nhat-Thanh Nguyen",
     "email": "nnthanh101@gmail.com"
   },
   "metadata": {
-    "description": "1xOps Operations Enterprise: enterprise add-ons built on Anthropic's operations plugin."
+    "description": "1ops: enterprise operations add-ons for Claude, built on Anthropic's operations plugin."
   },
   "plugins": [
     {
-      "name": "operations-enterprise",
-      "source": "./plugins/operations-enterprise",
-      "description": "Enterprise add-on for Anthropic's operations plugin: connector-verified, evidence-cited, approval-gated playbooks on real assets."
+      "name": "1ops",
+      "source": "./plugins/1ops",
+      "description": "Connector-verified, evidence-cited, approval-gated operations playbooks on real assets. Requires Anthropic's operations plugin."
     }
   ],
   "allowCrossMarketplaceDependenciesOn": [

@@ -1,4 +1,4 @@
-# 1xOps Operations Enterprise
+# 1ops
 
 An enterprise platform and operations add-on for Anthropic's free **operations** plugin. Anthropic's plugin gives the general playbooks: change request, runbook, risk, compliance, capacity, status, vendor review and process. This add-on adds only what enterprise platform teams need on top:
 - every connector checked before a playbook runs;
@@ -7,15 +7,15 @@ An enterprise platform and operations add-on for Anthropic's free **operations**
 
 ## How it builds on Anthropic's plugin
 
-`plugin.json` declares `dependencies: ["operations@knowledge-work-plugins"]`, so installing this add-on also installs Anthropic's free plugin. Anthropic's commands stay `/operations:*`, and ours are `/operations-enterprise:*`. We never ship a plugin named `operations`: a same-name plugin replaces Anthropic's whole plugin, which we tested on 2026-11-16 and which matches the Claude Code docs on name conflicts.
+`plugin.json` declares `dependencies: ["operations@knowledge-work-plugins"]`, so installing this add-on also installs Anthropic's free plugin. Anthropic's commands stay `/operations:*`, and ours are `/1ops:*`. We never ship a plugin named `operations`: a same-name plugin replaces Anthropic's whole plugin, which we tested on 2026-11-16 and which matches the Claude Code docs on name conflicts.
 
 ## Install
 
 ```
 /plugin marketplace add anthropics/knowledge-work-plugins
 /plugin install operations@knowledge-work-plugins
-/plugin marketplace add 1xOps/operations-enterprise      # private: your GitHub account needs access
-/plugin install operations-enterprise@1xops
+/plugin marketplace add 1xOps/1ops      # private: your GitHub account needs access
+/plugin install 1ops@1ops
 ```
 
 Tested against `anthropics/knowledge-work-plugins` at e91a134584eb (operations 1.3.0).
