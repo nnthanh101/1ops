@@ -18,4 +18,4 @@ jobs:
         with:
           node-version: 24
       - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict .
-      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict plugins/enterprise-ops
+      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict plugins/operations-enterprise
