@@ -1,0 +1,12 @@
+{
+  "name": "1xops-enterprise",
+  "owner": { "name": "Nhat-Thanh Nguyen", "email": "nnthanh101@gmail.com" },
+  "metadata": { "description": "1xOps Enterprise Ops: enterprise platform and operations add-ons for Anthropic's operations plugin." },
+  "plugins": [
+    {
+      "name": "enterprise-ops",
+      "source": "./plugins/enterprise-ops",
+      "description": "Connector-verified, evidence-cited, approval-gated operations playbooks on real assets. Requires Anthropic's operations plugin."
+    }
+  ]
+}
