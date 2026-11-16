@@ -1,5 +1,7 @@
 # 1ops
 
+**1ops is an AI product of [OceanSoft.io](https://oceansoft.io).** Web: 1ops.oceansoft.io. Licensing and support: OceanSoft.io.
+
 An enterprise platform and operations add-on for Anthropic's free **operations** plugin. Anthropic's plugin gives the general playbooks: change request, runbook, risk, compliance, capacity, status, vendor review and process. This add-on adds only what enterprise platform teams need on top:
 - every connector checked before a playbook runs;
 - figures taken from the real asset, each with its source;
