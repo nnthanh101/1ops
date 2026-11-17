@@ -20,7 +20,8 @@ MARKETPLACES = {
 }
 
 # Baseline every scope receives: the plugin, its base dependency, no secret reads,
-# and a person's yes before anything leaves the machine or rewrites history.
+# and a person's yes before anything leaves the machine, rewrites history or changes AWS or Azure
+# (sessions sign in read-only; these rules ask, the read-only identity is the boundary).
 BASELINE = {
     "extraKnownMarketplaces": MARKETPLACES,
     "enabledPlugins": {"1xops@1xops": True, "operations@knowledge-work-plugins": True},
@@ -34,6 +35,36 @@ BASELINE = {
             "Bash(gh release *)",
             "Bash(terraform apply *)",
             "Bash(terraform destroy *)",
+            "Bash(aws * create-*)",
+            "Bash(aws * delete-*)",
+            "Bash(aws * put-*)",
+            "Bash(aws * update-*)",
+            "Bash(aws * modify-*)",
+            "Bash(aws * terminate-*)",
+            "Bash(aws * start-*)",
+            "Bash(aws * stop-*)",
+            "Bash(aws * attach-*)",
+            "Bash(aws * detach-*)",
+            "Bash(aws * tag-*)",
+            "Bash(aws * untag-*)",
+            "Bash(aws s3 cp *)",
+            "Bash(aws s3 mv *)",
+            "Bash(aws s3 rm *)",
+            "Bash(aws s3 sync *)",
+            "Bash(aws cloudformation deploy *)",
+            "Bash(az * create*)",
+            "Bash(az * delete*)",
+            "Bash(az * update*)",
+            "Bash(az * start*)",
+            "Bash(az * stop*)",
+            "Bash(az * restart*)",
+            "Bash(az * deallocate*)",
+            "Bash(az * assign*)",
+            "Bash(az * add*)",
+            "Bash(az * remove*)",
+            "Bash(az * import*)",
+            "Bash(az * invoke*)",
+            "Bash(az rest *)",
         ],
     },
 }

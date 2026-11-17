@@ -9,14 +9,15 @@
 ## Install
 
 ```
-/plugin install 1xops --marketplace nnthanh101/1xops
+/plugin marketplace add nnthanh101/1xops
+/plugin install 1xops@1xops
 ```
 
 ## Commands
 
 | Command | What it does | Status |
 |---|---|---|
-| `/1xops:check` | Lists each connector as ready, signed out or missing, with the fix | Sprint 1 |
+| `/1xops:check` | Lists each connector as ready, signed out or missing, with the fix; runs `1xops doctor` | Available |
 | `/1xops:cost-check` | Top AWS (later Azure) savings with \$/month and source | Sprint 1–2 |
 | `/1xops:change-request` | CAB-ready change request from `terraform show -json` | Sprint 2 |
 | `/1xops:ai-spend` | AI spend by team, vendor and seat vs API | Sprint 3 |

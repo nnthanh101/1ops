@@ -86,14 +86,79 @@ export function checkSignIn(awsProfile) {
   return rows;
 }
 
+// (status, fix) for a failed AWS identity call, from the AWS CLI's own error text.
+export function awsFix(error, profile) {
+  if (/could not be found/i.test(error)) return ['missing', `profile ${profile} not found: aws configure sso --profile ${profile}, or set AWS_CONFIG_FILE`];
+  if (/expired|refresh failed|sso.*token|nocredentials|unable to locate credentials/i.test(error)) return ['signed out', `aws sso login --profile ${profile}`];
+  const first = error.split('\n').find((l) => l.trim()) ?? 'AWS identity call failed';
+  return ['check', first.replace(/^aws: \[ERROR\]: /, '').slice(0, 120)];
+}
+
+// read: Reader roles only; write: any role that can change things; unknown: no roles seen.
+export function azureAccess(roles = []) {
+  if (!roles.length) return 'unknown';
+  if (roles.some((r) => /owner|contributor|administrator/i.test(r))) return 'write';
+  if (roles.every((r) => /reader/i.test(r))) return 'read';
+  return 'unknown';
+}
+const AZURE_ACCESS = { read: 'read-only', write: 'can change things: use a read-only (Reader) identity', unknown: 'access unknown: use a read-only (Reader) identity' };
+
+function awsConnector(v, values) {
+  const name = `aws ${v}`;
+  const profile = values[v] || process.env[v] || '';
+  if (!profile) return [name, 'missing', `set ${v} in .env.1xops or the shell (1xops setup)`];
+  if (!which('aws')) return [name, 'missing', 'install the AWS CLI'];
+  const { code, out } = run('aws', ['sts', 'get-caller-identity', '--output', 'json', '--profile', profile]);
+  if (code !== 0) return [name, ...awsFix(out, profile)];
+  let id;
+  try { id = JSON.parse(out); } catch { return [name, 'check', 'AWS identity call returned no account']; }
+  const access = accessFromRole(id.Arn ?? '');
+  return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(id.Account ?? '')}, ${ACCESS[access]}`];
+}
+
+function azureConnector() {
+  if (!which('az')) return ['azure', 'missing', 'install the Azure CLI'];
+  const who = run('az', ['account', 'show', '--query', 'user.name', '--output', 'tsv']);
+  if (who.code !== 0 || !who.out) return ['azure', 'signed out', 'az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR'];
+  const roles = run('az', ['role', 'assignment', 'list', '--assignee', who.out, '--all', '--query', '[].roleDefinitionName', '--output', 'json'], 60000);
+  let names = [];
+  try { names = roles.code === 0 ? JSON.parse(roles.out) : []; } catch { /* not JSON */ }
+  const access = azureAccess(names);
+  return ['azure', access === 'read' ? 'ready' : 'check', AZURE_ACCESS[access]];
+}
+
+// [connector, status, fix] for each connector in .env.1xops. Read-only identity calls only.
+export function checkConnectors(file) {
+  if (!existsSync(file)) return [['connectors', 'missing', `no ${file} here: run 1xops setup`]];
+  let cfg;
+  try { cfg = cf.load(file); } catch (err) { return [['connectors', 'missing', err.message]]; }
+  if (!Object.keys(cfg.connectors).length) return [['connectors', 'missing', `ONEXOPS_CONNECTORS is empty in ${file}: run 1xops setup`]];
+  const rows = [];
+  for (const connector of Object.keys(cfg.connectors)) {
+    let servers;
+    try { servers = s.loadProfile(connector).mcpServers; } catch (err) { rows.push([connector, 'missing', err.message]); continue; }
+    const awsVars = [];
+    let azure = false;
+    for (const [serverName, server] of Object.entries(servers)) {
+      const env = server.env ?? {};
+      if ('AWS_PROFILE' in env) awsVars.push(...[...env.AWS_PROFILE.matchAll(/\$\{([A-Z0-9_]+)(?::-[^}]*)?\}/g)].map((m) => m[1]));
+      else if ('AZURE_TENANT_ID' in env) azure = true;
+      else if (server.type === 'http') rows.push([serverName, 'check', `signs in inside the host: run /mcp and choose ${serverName}`]);
+      else rows.push([serverName, 'check', 'no sign-in check for this connector']);
+    }
+    rows.push(...[...new Set(awsVars)].map((v) => awsConnector(v, cfg.values)));
+    if (azure) rows.push(azureConnector());
+  }
+  return rows;
+}
+
+const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow' };
+
 export function doctor(opts, version) {
   const rows = [...checkTools(), ...checkSignIn(opts['aws-profile'])];
-  const shown = rows.map(([name, required, ok, detail]) => [
-    name,
-    required ? 'required' : 'optional',
-    ok ? color('green', 'ok') : required ? color('red', 'missing') : color('yellow', 'check'),
-    scrub(detail),
-  ]);
+  const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
+  shown.push(...checkConnectors(opts.file).map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
+  for (const r of shown) r[2] = color(RESULT_STYLE[r[2]], r[2]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
   const failed = rows.filter((r) => r[1] && !r[2]).map((r) => r[0]);
   if (failed.length) {

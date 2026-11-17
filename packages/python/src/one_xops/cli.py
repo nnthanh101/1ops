@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 import re
 import shlex
 import shutil
@@ -137,18 +138,190 @@ def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
     return rows
 
 
+def aws_fix(error: str, profile: str) -> tuple[str, str]:
+    """(status, fix) for a failed AWS identity call, from the AWS CLI's own error text."""
+    if re.search(r"could not be found", error, re.IGNORECASE):
+        return (
+            "missing",
+            f"profile {profile} not found: aws configure sso --profile {profile}, or set AWS_CONFIG_FILE",
+        )
+    if re.search(
+        r"expired|refresh failed|sso.*token|nocredentials|unable to locate credentials",
+        error,
+        re.IGNORECASE,
+    ):
+        return "signed out", f"aws sso login --profile {profile}"
+    first = next((line for line in error.splitlines() if line.strip()), "AWS identity call failed")
+    return "check", first.removeprefix("aws: [ERROR]: ")[:120]
+
+
+def azure_access(roles: list[str]) -> str:
+    """read: Reader roles only; write: any role that can change things; unknown: no roles seen."""
+    if not roles:
+        return "unknown"
+    if any(re.search(r"owner|contributor|administrator", r, re.IGNORECASE) for r in roles):
+        return "write"
+    if all(re.search(r"reader", r, re.IGNORECASE) for r in roles):
+        return "read"
+    return "unknown"
+
+
+AZURE_ACCESS = {
+    "read": "read-only",
+    "write": "can change things: use a read-only (Reader) identity",
+    "unknown": "access unknown: use a read-only (Reader) identity",
+}
+
+
+def _aws_connector(var: str, values: dict[str, str]) -> tuple[str, str, str]:
+    name = f"aws {var}"
+    profile = values.get(var) or os.environ.get(var, "")
+    if not profile:
+        return name, "missing", f"set {var} in .env.1xops or the shell (1xops setup)"
+    if not shutil.which("aws"):
+        return name, "missing", "install the AWS CLI"
+    code, out = _run(
+        ["aws", "sts", "get-caller-identity", "--output", "json", "--profile", profile]
+    )
+    if code != 0:
+        status, fix = aws_fix(out, profile)
+        return name, status, fix
+    try:
+        ident = json.loads(out)
+    except ValueError:
+        return name, "check", "AWS identity call returned no account"
+    access = access_from_role(ident.get("Arn", ""))
+    detail = f"profile {profile}, account {_mask(ident.get('Account', ''))}, {ACCESS[access]}"
+    return name, "ready" if access == "read" else "check", detail
+
+
+def _azure_connector() -> tuple[str, str, str]:
+    if not shutil.which("az"):
+        return "azure", "missing", "install the Azure CLI"
+    fix = "az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR"
+    code, out = _run(["az", "account", "show", "--query", "user.name", "--output", "tsv"])
+    if code != 0 or not out:
+        return "azure", "signed out", fix
+    code, roles = _run(
+        [
+            "az",
+            "role",
+            "assignment",
+            "list",
+            "--assignee",
+            out,
+            "--all",
+            "--query",
+            "[].roleDefinitionName",
+            "--output",
+            "json",
+        ],
+        timeout=60,
+    )
+    try:
+        names = json.loads(roles) if code == 0 else []
+    except ValueError:
+        names = []
+    access = azure_access(names)
+    return "azure", "ready" if access == "read" else "check", AZURE_ACCESS[access]
+
+
+def check_connectors(file: str) -> list[tuple[str, str, str]]:
+    """(connector, status, fix) for each connector in .env.1xops. Read-only identity calls only."""
+    path = Path(file)
+    if not path.is_file():
+        return [("connectors", "missing", f"no {file} here: run 1xops setup")]
+    try:
+        cfg = cf.load(path)
+    except (ValueError, OSError) as exc:
+        return [("connectors", "missing", str(exc))]
+    if not cfg["connectors"]:
+        return [
+            ("connectors", "missing", f"ONEXOPS_CONNECTORS is empty in {file}: run 1xops setup")
+        ]
+    rows = []
+    for connector in cfg["connectors"]:
+        try:
+            servers = s.load_profile(connector)["mcpServers"]
+        except (ValueError, OSError) as exc:
+            rows.append((connector, "missing", str(exc)))
+            continue
+        aws_vars, azure = [], False
+        for server_name, server in servers.items():
+            env = server.get("env", {})
+            if "AWS_PROFILE" in env:
+                aws_vars += cf.VAR.findall(env["AWS_PROFILE"])
+            elif "AZURE_TENANT_ID" in env:
+                azure = True
+            elif server.get("type") == "http":
+                rows.append(
+                    (
+                        server_name,
+                        "check",
+                        f"signs in inside the host: run /mcp and choose {server_name}",
+                    )
+                )
+            else:
+                rows.append((server_name, "check", "no sign-in check for this connector"))
+        rows += [_aws_connector(v, cfg["values"]) for v in dict.fromkeys(aws_vars)]
+        if azure:
+            rows.append(_azure_connector())
+    return rows
+
+
+STYLES = {"bold": (1, 22), "dim": (2, 22), "green": (32, 39), "red": (31, 39), "yellow": (33, 39)}
+
+
+def color(style: str, text: str) -> str:
+    """The same codes as Node.js util.styleText: plain text unless stdout is a terminal."""
+    if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
+        return text
+    on, off = STYLES[style]
+    return f"\x1b[{on}m{text}\x1b[{off}m"
+
+
+def plain_table(title: str, columns: list[str], rows: list[list[str]]) -> None:
+    """The same plain table as the Node.js CLI, so both print the same bytes."""
+    width = [max([len(c), *(len(str(r[i])) for r in rows)]) for i, c in enumerate(columns)]
+
+    def line(cells: list[str]) -> str:
+        return "  ".join(str(c).ljust(width[i]) for i, c in enumerate(cells))
+
+    print(color("bold", title))
+    print(color("dim", line(columns)))
+    for r in rows:
+        print(line(r))
+
+
+RESULT_STYLE = {
+    "ok": "green",
+    "ready": "green",
+    "missing": "red",
+    "signed out": "yellow",
+    "check": "yellow",
+}
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     rows = check_tools() + check_sign_in(args.aws_profile)
-    table = Table(title=f"1xops {__version__} doctor")
-    for col in ("check", "needed", "result", "detail"):
-        table.add_column(col)
-    for name, required, ok, detail in rows:
-        result = "[green]ok[/]" if ok else ("[red]missing[/]" if required else "[yellow]check[/]")
-        table.add_row(name, "required" if required else "optional", result, scrub(detail))
-    console.print(table)
+    shown = [
+        [
+            name,
+            "required" if required else "optional",
+            "ok" if ok else ("missing" if required else "check"),
+            scrub(detail),
+        ]
+        for name, required, ok, detail in rows
+    ]
+    shown += [
+        [name, "connector", status, scrub(fix)] for name, status, fix in check_connectors(args.file)
+    ]
+    for r in shown:
+        r[2] = color(RESULT_STYLE[r[2]], r[2])
+    plain_table(f"1xops {__version__} doctor", ["check", "needed", "result", "detail"], shown)
     failed = [r[0] for r in rows if r[1] and not r[2]]
     if failed:
-        console.print(f"[red]Required: {', '.join(failed)}[/]")
+        print(color("red", f"Required: {', '.join(failed)}"))
         return 1
     return 0
 
@@ -307,8 +480,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"1xops {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("doctor", help="check prerequisites and read-only sign-in")
+    p = sub.add_parser("doctor", help="check prerequisites, sign-in and connectors")
     p.add_argument("--aws-profile", help="AWS profile to check (default: current)")
+    p.add_argument(
+        "--file", default=cf.DEFAULT_FILE, help="connectors to check (default: .env.1xops)"
+    )
     p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("install", help="add the marketplaces and install the plugin")

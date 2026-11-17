@@ -1,42 +1,75 @@
 #!/usr/bin/env bash
 # verify-release.sh VERSION - prove what customers receive: install 1xops VERSION from each channel in a clean
-# container and run the same checks. Prints a Markdown evidence table; exit 0 only when every channel passes.
-# Read-only on the registries; needs Docker. `task release` runs it; run it alone to re-prove a live version.
+# container, as a non-root user, with the README's install command, and run the same checks. Prints a Markdown
+# evidence table with the measured seconds from `docker run` (image pull included) to the check's result.
+# Exit 0 only when every channel passes. Read-only on the registries; needs Docker. `task release` runs it.
 set -uo pipefail
 V=${1:?usage: verify-release.sh VERSION}
 fails=0
+logs=$(mktemp -d)
 
 # The checks every channel must pass, run inside the container as `1xops` (one string, run by sh -c).
 CHECKS='set -e
+cd "$HOME"
 v=$(1xops --version)
 1xops profiles >/dev/null
-mkdir -p /tmp/org && 1xops config --scope org --out /tmp/org --connectors aws azure itsm --yes >/dev/null
-grep -q "@azure/mcp@" /tmp/org/managed-mcp.json && ! grep -q "@latest" /tmp/org/managed-mcp.json
-grep -q "mcp__atlassian__\*" /tmp/org/managed-settings.json
-mkdir -p /tmp/p && if 1xops config --scope local --dir /tmp/p --connectors aws --yes >/dev/null 2>&1; then exit 3; fi
-[ -z "$(ls -A /tmp/p)" ]
-echo "$v; profiles, org config (pinned, Jira asks first), local scope writes nothing without the host CLI"'
+mkdir -p org && 1xops config --scope org --out org --connectors aws azure itsm --yes >/dev/null
+grep -q "@azure/mcp@" org/managed-mcp.json && ! grep -q "@latest" org/managed-mcp.json
+grep -q "mcp__atlassian__\*" org/managed-settings.json
+grep -q "Bash(aws \* delete-\*)" org/managed-settings.json && grep -q "Bash(az \* delete\*)" org/managed-settings.json
+mkdir -p p && if 1xops config --scope local --dir p --connectors aws --yes >/dev/null 2>&1; then exit 3; fi
+[ -z "$(ls -A p)" ]
+mkdir -p first && cd first
+1xops doctor >doctor.txt 2>&1 || true
+grep -Eq "^connectors +connector +missing +no \.env\.1xops here: run 1xops setup" doctor.txt
+printf "ONEXOPS_CONNECTORS=aws\nAWS_BILLING_PROFILE=readonly\nAWS_OPERATIONS_PROFILE=readonly\n" >.env.1xops
+sum=$(cksum .env.1xops)
+1xops doctor >doctor.txt 2>&1 || true
+grep -Eq "^aws AWS_BILLING_PROFILE +connector +missing +install the AWS CLI" doctor.txt
+[ "$sum" = "$(cksum .env.1xops)" ]
+grep " connector " doctor.txt >"$HOME/connectors.txt"
+echo "$v; doctor names each signed-out or missing connector with its fix and changes nothing; profiles, org config (pinned, Jira and cloud writes ask first), local scope writes nothing without the host CLI"'
 
-row() { # channel, image, install command
-  local out
-  if out=$(docker run --rm --pull always --entrypoint sh "$2" -c "$3 && $CHECKS" 2>&1 | tail -1) && [[ "$out" == "1xops $V;"* ]]; then
-    echo "| $1 | pass | $out |"
+row() { # channel, image, install command (the README's), extra docker args
+  local key=${1//[^A-Za-z0-9]/_} start code out secs
+  local log="$logs/$key.log"
+  start=$(date +%s)
+  # shellcheck disable=SC2086
+  docker run --rm --pull always $4 --entrypoint sh "$2" -c "set -e; $3; $CHECKS; cat \$HOME/connectors.txt >&2" >"$log" 2>"$logs/$key.connectors"
+  code=$?
+  secs=$(( $(date +%s) - start ))
+  out=$(sed -n '$p' "$log")
+  if [ "$code" -eq 0 ] && [[ "$out" == "1xops $V;"* ]]; then
+    echo "| $1 | pass | ${secs}s | $out |"
   else
-    echo "| $1 | **FAIL** | ${out:-no output} |"; fails=$((fails + 1))
+    echo "| $1 | **FAIL** (exit $code) | ${secs}s | ${out:-no output} |"; fails=$((fails + 1))
   fi
 }
 
-echo "**1xops $V, verified $(date -u +%Y-%m-%dT%H:%MZ) in clean containers** (\`scripts/verify-release.sh $V\`)"
+echo "**1xops $V, verified $(date -u +%Y-%m-%dT%H:%MZ) in clean containers as a non-root user** (\`scripts/verify-release.sh $V\`)"
 echo
-echo "| Channel | Result | Output |"
-echo "|---|---|---|"
-row "PyPI (python:3.14-slim)" python:3.14-slim "pip install -q --root-user-action=ignore 1xops==$V >/dev/null 2>&1"
-row "npm (node:24-slim, no Python)" node:24-slim "npm install -g --silent 1xops@$V >/dev/null 2>&1"
-row "Docker Hub nnthanh101/1xops:$V" "nnthanh101/1xops:$V" "true"
-row "ghcr.io/nnthanh101/1xops:$V" "ghcr.io/nnthanh101/1xops:$V" "true"
+echo "| Channel | Result | Seconds, pull to result | Output |"
+echo "|---|---|---|---|"
+U='--user 1000:1000 -e HOME=/tmp/home'
+row "PyPI (uv, python 3.14)" ghcr.io/astral-sh/uv:python3.14-trixie-slim \
+  "mkdir -p \$HOME; unset UV_TOOL_BIN_DIR; uv tool install -q 1xops==$V >/dev/null 2>&1; export PATH=\$HOME/.local/bin:\$PATH" "$U"
+row "npm (node:24-slim, no Python)" node:24-slim \
+  "mkdir -p \$HOME; npm install -g --silent --prefix \$HOME/.npm 1xops@$V >/dev/null 2>&1; export PATH=\$HOME/.npm/bin:\$PATH" "$U"
+row "Docker Hub nnthanh101/1xops:$V" "nnthanh101/1xops:$V" "export HOME=/tmp/home; mkdir -p \$HOME" ""
+row "ghcr.io/nnthanh101/1xops:$V" "ghcr.io/nnthanh101/1xops:$V" "export HOME=/tmp/home; mkdir -p \$HOME" ""
+
+# Python and Node.js must print the same connector rows. Column widths follow each container's own tool rows, so
+# spacing is normalised here; byte-for-byte equality on one machine is checked by `task test`.
+py_rows="$logs/PyPI__uv__python_3_14_.connectors" js_rows="$logs/npm__node_24_slim__no_Python_.connectors"
+norm() { sed -E 's/ +/ /g; s/ $//' "$1"; }
+if [ -s "$py_rows" ] && [ "$(norm "$py_rows")" = "$(norm "$js_rows")" ]; then
+  echo "| PyPI and npm print the same connector rows | pass | | spacing normalised |"
+else
+  echo "| PyPI and npm print the same connector rows | **FAIL** | | differ or empty |"; fails=$((fails + 1))
+fi
 hub=$(docker buildx imagetools inspect "nnthanh101/1xops:$V" 2>/dev/null | awk '/^Digest/{print $2}')
 gh=$(docker buildx imagetools inspect "ghcr.io/nnthanh101/1xops:$V" 2>/dev/null | awk '/^Digest/{print $2}')
-if [ -n "$hub" ] && [ "$hub" = "$gh" ]; then echo "| Same image on both registries | pass | \`$hub\` |"; else echo "| Same image on both registries | **FAIL** | Docker Hub ${hub:-none}, ghcr.io ${gh:-none} |"; fails=$((fails + 1)); fi
+if [ -n "$hub" ] && [ "$hub" = "$gh" ]; then echo "| Same image on both registries | pass | | \`$hub\` |"; else echo "| Same image on both registries | **FAIL** | | Docker Hub ${hub:-none}, ghcr.io ${gh:-none} |"; fails=$((fails + 1)); fi
 echo
 [ "$fails" -eq 0 ] && echo "All channels pass." || echo "$fails check(s) failed."
 exit "$fails"
