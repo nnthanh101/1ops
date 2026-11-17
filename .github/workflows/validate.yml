@@ -82,6 +82,8 @@ jobs:
           py=$(grep -E '^version = ' ../python/pyproject.toml | cut -d'"' -f2)
           js=$(node -p "require('./package.json').version")
           test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
+      - name: Tests (native Node.js, no dependencies)
+        run: npm test
       - run: npm pack --dry-run
 
   docker:

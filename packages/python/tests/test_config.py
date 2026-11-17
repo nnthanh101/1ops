@@ -97,24 +97,46 @@ def test_mask_never_shows_full_account():
     assert cli._mask("123456789012") == "****9012"
 
 
-# ── 1xops.yaml ────────────────────────────────────────────────────────────────
+# ── .env.1xops ───────────────────────────────────────────────────────────────
 
 from one_xops import config_file as cf
 
 
-def _yaml(tmp_path: Path, text: str) -> Path:
-    f = tmp_path / "1xops.yaml"
+def _env(tmp_path: Path, text: str) -> Path:
+    f = tmp_path / ".env.1xops"
     f.write_text(text)
     return f
 
 
-def test_yaml_rejects_unquoted_non_strings_and_secrets(tmp_path: Path):
-    with pytest.raises(TypeError, match="quoted string"):
-        cf.load(_yaml(tmp_path, "connectors:\n  azure:\n    AZURE_TENANT_ID: 0123\n"))
+def test_env_file_refuses_secrets_unknown_settings_and_bad_scope(tmp_path: Path):
     with pytest.raises(ValueError, match="secret"):
-        cf.load(_yaml(tmp_path, "connectors:\n  aws:\n    GRAFANA_API_KEY: 'x'\n"))
-    with pytest.raises(ValueError, match="scope"):
-        cf.load(_yaml(tmp_path, "scope: everyone\n"))
+        cf.load(_env(tmp_path, "GRAFANA_API_KEY=x\n"))
+    with pytest.raises(ValueError, match="unknown setting"):
+        cf.load(_env(tmp_path, "ONEXOPS_SCOPES=team\n"))
+    with pytest.raises(ValueError, match="ONEXOPS_SCOPE"):
+        cf.load(_env(tmp_path, "ONEXOPS_SCOPE=everyone\n"))
+    with pytest.raises(ValueError, match="KEY=value"):
+        cf.load(_env(tmp_path, "aws_region=x\n"))
+
+
+def test_env_file_parses_quotes_comments_and_leading_zeros(tmp_path: Path):
+    cfg = cf.load(
+        _env(
+            tmp_path,
+            "# comment\nONEXOPS_CONNECTORS=aws, azure\n"
+            "AZURE_TENANT_ID=0123  # kept as text\nAWS_REGION='ap-southeast-2'\n",
+        )
+    )
+    assert list(cfg["connectors"]) == ["aws", "azure"]
+    assert cfg["values"] == {"AZURE_TENANT_ID": "0123", "AWS_REGION": "ap-southeast-2"}
+    assert cfg["scope"] == "team" and cfg["dir"] == "."
+
+
+def test_dump_round_trips(tmp_path: Path):
+    config = {"scope": "local", "dir": "/w", "connectors": {"aws": {"AWS_REGION": "r"}, "itsm": {}}}
+    cfg = cf.load(_env(tmp_path, cf.dump(config)))
+    assert cfg["scope"] == "local" and cfg["dir"] == "/w"
+    assert list(cfg["connectors"]) == ["aws", "itsm"] and cfg["values"] == {"AWS_REGION": "r"}
 
 
 def test_variables_and_substitute():
@@ -125,9 +147,10 @@ def test_variables_and_substitute():
 
 
 def test_team_file_keeps_var_references_out_of_git(tmp_path: Path):
-    f = _yaml(
+    f = _env(
         tmp_path,
-        f"scope: team\ndir: '{tmp_path}'\nconnectors:\n  aws:\n    AWS_OPERATIONS_PROFILE: 'ops-ro'\n",
+        f"ONEXOPS_SCOPE=team\nONEXOPS_DIR={tmp_path}\nONEXOPS_CONNECTORS=aws\n"
+        "AWS_OPERATIONS_PROFILE=ops-ro\n",
     )
     assert cli.main(["config", "--file", str(f), "--yes"]) == 0
     text = (tmp_path / ".mcp.json").read_text()
@@ -135,15 +158,15 @@ def test_team_file_keeps_var_references_out_of_git(tmp_path: Path):
 
 
 def test_env_prints_quoted_exports(tmp_path: Path, capsys):
-    f = _yaml(
+    f = _env(
         tmp_path,
-        "connectors:\n  aws:\n    AWS_REGION: 'ap-southeast-2'\n    AWS_OPERATIONS_PROFILE: 'a b'\n",
+        "ONEXOPS_CONNECTORS=aws\nAWS_REGION=ap-southeast-2\nAWS_OPERATIONS_PROFILE='a b'\n",
     )
     assert cli.main(["env", "--file", str(f)]) == 0
     out = capsys.readouterr().out
-    assert (
-        "export AWS_REGION=ap-southeast-2" in out and "export AWS_OPERATIONS_PROFILE='a b'" in out
-    )
+    assert "export AWS_REGION=ap-southeast-2" in out
+    assert "export AWS_OPERATIONS_PROFILE='a b'" in out
+    assert "ONEXOPS_" not in out
 
 
 def test_local_scope_without_host_cli_writes_nothing(tmp_path: Path, monkeypatch):

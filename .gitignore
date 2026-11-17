@@ -8,4 +8,5 @@ __pycache__/
 node_modules/
 *.tgz
 .DS_Store
-1xops.yaml
+.env.1xops
+packages/npm/profiles/

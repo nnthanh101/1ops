@@ -8,11 +8,11 @@ Two audiences: people who **use** 1xops, and the maintainer who **releases** it.
 |---|---|
 | Check prerequisites and sign-in | `uvx 1xops doctor` |
 | Install the plugin | `uvx 1xops install --yes` |
-| Configure (guided) | `uvx 1xops setup` → writes `1xops.yaml`, shows the diff, asks before writing |
-| Configure (file) | `uvx 1xops config --file 1xops.yaml --yes` |
+| Configure (guided) | `uvx 1xops setup` or `npx 1xops setup` → writes `.env.1xops`, shows the diff, asks before writing |
+| Configure (file) | `uvx 1xops config --file .env.1xops --yes` |
 | Team or org scope: load your values | `eval "$(uvx 1xops env)"` |
 
-Scopes, the `1xops.yaml` format and the connector profiles are in the [command-line README](../packages/python/README.md). Keep a personal `1xops.yaml` out of git.
+Scopes, the `.env.1xops` format and the connector profiles are in the [command-line README](../packages/python/README.md). Keep a personal `1xops.yaml` out of git.
 
 ## Contribute (every clone)
 
@@ -69,5 +69,5 @@ gh api -X POST repos/nnthanh101/1xops/rulesets --input .github/rulesets/main.jso
 1. Bump the same version in `packages/python/pyproject.toml` and `packages/npm/package.json` on a `feature/*` branch; land on `develop`.
 2. Open the pull request `develop` → `main`; CI runs; merge.
 3. Tag on `main`: `git tag v0.2.0 && git push origin v0.2.0`.
-4. Approve the `release` environment. PyPI goes first, then npm (the launcher runs the PyPI version), with the images in parallel.
+4. Approve the `release` environment once: PyPI, npm and the images publish in parallel.
 5. Check: `uvx 1xops@0.2.0 --version`, `npx 1xops@0.2.0 --version`, `docker run --rm ghcr.io/nnthanh101/1xops:0.2.0 --version`.

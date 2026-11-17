@@ -21,6 +21,7 @@ concurrency:
 
 jobs:
   check:
+    name: Check version
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
@@ -44,7 +45,9 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "commit is not on main"; exit 1; }
           echo "version=$py" >> "$GITHUB_OUTPUT"
 
+  # The three publish jobs start together after the check, so one approval of `release` covers them all.
   pypi:
+    name: PyPI
     needs: check
     runs-on: ubuntu-26.04
     timeout-minutes: 10
@@ -65,7 +68,8 @@ jobs:
           password: ${{ secrets.PYPI_TOKEN }} # empty on GitHub → trusted publishing
 
   npm:
-    needs: [check, pypi] # the npm launcher runs the PyPI version, so PyPI goes first
+    name: npm
+    needs: check
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     environment: release
@@ -87,11 +91,13 @@ jobs:
       - name: npm auth (act only; on GitHub setup-node writes it)
         if: ${{ env.ACT }}
         run: echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
-      - run: npm publish --access public $([ "$ACT" = "true" ] || echo --provenance)
+      - name: Publish
+        run: npm publish --access public $([ "$ACT" = "true" ] || echo --provenance)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   docker:
+    name: Container image (ghcr.io + Docker Hub)
     needs: check
     if: ${{ !github.event.act }} # images publish from GitHub only: the act runner image has no Docker CLI
     runs-on: ubuntu-26.04
