@@ -60,7 +60,11 @@ done
 echo "release: approve the 'release' environment once: https://github.com/$R/actions/runs/$run"
 gh run watch "$run" -R $R --exit-status >/dev/null || { echo "release: the Release run failed; see the link above"; exit 1; }
 
-mkdir -p tmp
+# The registries need a moment to serve a new version everywhere; prove only once both answer for it (up to 5 min).
+for _ in $(seq 30); do
+  curl -sf "https://pypi.org/pypi/1xops/$V/json" >/dev/null && curl -sf "https://registry.npmjs.org/1xops/$V" >/dev/null && break
+  sleep 10
+done
 proof=tmp/evidence-$V.md
 set +e; bash scripts/verify-release.sh "$V" | tee "$proof"; failed=${PIPESTATUS[0]}; set -e
 [ -n "$STORY" ] && gh issue comment "$STORY" -R $R --body-file "$proof"
