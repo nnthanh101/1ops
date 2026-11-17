@@ -52,4 +52,4 @@ eval "$(1ops env)"                    # team/org: load your values into the shel
 - Built-in profiles pin every server version and use `${VAR}` references for profiles, tokens and URLs, so no secret is written to a file.
 - Your own profile is a JSON file with an `mcpServers` object: `--connectors ./my-profile.json`.
 
-Licence: Apache-2.0. © 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io.
+Licence: Apache-2.0. © 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io. Licence, trademarks and third-party components: [NOTICE](https://github.com/nnthanh101/1ops/blob/develop/NOTICE).

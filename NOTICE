@@ -1,8 +1,42 @@
 1ops
 Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+Licensed under the Apache License, Version 2.0 (see LICENSE). This NOTICE and that
+LICENSE cover the whole repository: the plugin (plugins/1ops), the command line
+(packages/python, PyPI "1ops"), the npm launcher (packages/npm, npm "1ops") and the
+container image (Docker Hub "nnthanh101/1ops").
 
 "1ops" and "OceanSoft" are trademarks of OceanSoft.io. The Apache License does not
 grant permission to use these names, logos or trademarks, except as required to
 describe the origin of the work (Apache-2.0, section 6).
+
+Third-party components
+----------------------
+Not copied into this repository or its packages unless stated. Each keeps its own
+licence. Every component below was approved by the maintainer on 2026-11-17; any new
+third-party component needs the maintainer's approval first.
+
+Upstream (git submodule, upstream/knowledge-work-plugins; plugins/operations links to it)
+  knowledge-work-plugins   https://github.com/anthropics/knowledge-work-plugins   Apache-2.0
+
+Runtime dependencies of the command line (installed from PyPI, not bundled)
+  rich 15.0.0              https://github.com/Textualize/rich                     MIT
+  PyYAML 6.0.3             https://github.com/yaml/pyyaml                         MIT
+
+Build, test and run tools (not distributed)
+  uv 0.13.8                https://github.com/astral-sh/uv                        MIT OR Apache-2.0
+  hatchling 1.33.0         https://github.com/pypa/hatch                          MIT
+  pytest 9.2.0             https://github.com/pytest-dev/pytest                   MIT
+  ruff 0.17.5              https://github.com/astral-sh/ruff                      MIT
+  act                      https://github.com/nektos/act                          MIT (local runs only)
+
+Connector servers named in the built-in profiles (fetched by the user at run time)
+  awslabs.billing-cost-management-mcp-server 0.0.45   https://github.com/awslabs/mcp   Apache-2.0
+  awslabs.cloudtrail-mcp-server 0.1.1                 https://github.com/awslabs/mcp   Apache-2.0
+  awslabs.cloudwatch-mcp-server 0.3.1                 https://github.com/awslabs/mcp   Apache-2.0
+  awslabs.well-architected-security-mcp-server 0.2.1  https://github.com/awslabs/mcp   Apache-2.0
+  @azure/mcp 3.0.0                                    https://github.com/microsoft/mcp MIT
+  Atlassian remote server  https://mcp.atlassian.com/v2/mcp   hosted service, Atlassian's terms
+
+Container base image: python:3.15-slim (Docker Official Image); each package in it keeps
+its own licence.

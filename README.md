@@ -72,9 +72,9 @@ OceanSoft helps NZ and Australian businesses implement and maintain practical AW
 - One capability per pull request, proven on a real asset. Fixtures are for tests only.
 - CI runs strict plugin validation, the Python tests, the npm package check and the Docker build on every pull request. Run the same locally with [act](https://github.com/nektos/act): `act pull_request -W .github/workflows/validate.yml`.
 - Releases: a `v*` tag on `main` publishes PyPI, npm and Docker Hub after the release approver accepts. The upstream pin is bumped monthly by pull request.
-- New dependencies: official vendor libraries and servers only; anything third-party needs the maintainer's approval first.
+- New dependencies: official vendor libraries and servers only; anything third-party needs the maintainer's approval and a line in [NOTICE](NOTICE).
 - Ideas and bugs: [open an issue](https://github.com/nnthanh101/1ops/issues).
 
 ## Licence
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), [OceanSoft.io](https://www.oceansoft.io). "1ops" and "OceanSoft" are trademarks of OceanSoft.io.
+Apache-2.0 ([LICENSE](LICENSE)). Copyright, trademarks and every third-party component: [NOTICE](NOTICE).

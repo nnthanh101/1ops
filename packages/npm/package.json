@@ -8,6 +8,6 @@
   "repository": { "type": "git", "url": "git+https://github.com/nnthanh101/1ops.git", "directory": "packages/npm" },
   "bugs": "https://github.com/nnthanh101/1ops/issues",
   "bin": { "1ops": "bin/1ops.js" },
-  "files": ["bin/", "README.md", "LICENSE", "NOTICE"],
+  "files": ["bin/", "README.md"],
   "engines": { "node": ">=24" }
 }

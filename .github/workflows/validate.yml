@@ -33,8 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Licence copies match the root
-        run: cmp LICENSE ../../LICENSE && cmp NOTICE ../../NOTICE
       - run: uv sync --locked --group dev
       - run: uv run ruff check src tests && uv run ruff format --check src tests
       - run: uv run pytest -q
@@ -52,9 +50,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
-      - name: Versions match and licence copies match the root
+      - name: Versions match
         run: |
-          cmp LICENSE ../../LICENSE && cmp NOTICE ../../NOTICE
           py=$(grep -E '^version = ' ../python/pyproject.toml | cut -d'"' -f2)
           js=$(node -p "require('./package.json').version")
           test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
