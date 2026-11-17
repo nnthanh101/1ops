@@ -22,6 +22,8 @@ git config core.hooksPath .githooks      # secret scan, commit message and quick
 act pull_request -W .github/workflows/validate.yml   # the full CI, locally, before any pull request
 ```
 
+Rules: one capability per pull request, proven on a real asset (fixtures are for tests only); official vendor libraries only, and anything third-party needs the maintainer's approval and a line in [NOTICE](../NOTICE).
+
 Flow ([ADR 0003](adr/0003-git-standard.md)): `feature/*` is proven locally, then lands on `develop`; `develop` reaches `main` only by pull request; each release is a `v*` tag on `main`. GitHub Actions runs only for `main`, tags, the monthly schedule or by hand.
 
 ## Release (maintainer, once)

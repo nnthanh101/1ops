@@ -2,80 +2,60 @@
 
 **Reduce cloud and AI costs. Automate operational work. Keep your team in control.**
 
-1xops by [OceanSoft.io](https://www.oceansoft.io) is a free, open-source operations plugin for engineering teams on AWS, Azure and AI services. It finds cost savings, writes change requests and runs runbooks on your real systems, and it shows where every number came from.
+1xops is a free, open-source toolkit from [OceanSoft.io](https://www.oceansoft.io) for engineering teams on AWS, Azure and AI services. It connects your team's assistant to your cloud accounts and your Jira and Confluence, read-only, in a few minutes, for one person, a team or a whole organisation.
 
-[![Validate](https://github.com/nnthanh101/1xops/actions/workflows/validate.yml/badge.svg)](https://github.com/nnthanh101/1xops/actions/workflows/validate.yml) · Licence: [Apache-2.0](LICENSE)
+> **Status:** the first release (v0.2) is in review. The commands below work once it is published.
 
-## Principles
+## What you can do today
 
-1. **Every figure has a source.** Each saving, risk or status line names the API, file or board item it came from. If a number can't be sourced, it isn't shown.
-2. **Read-only by default.** Checks use read-only cloud roles. Nothing needs write access to give you an answer.
-3. **Nothing changes without a yes.** Filing a record, sending a report or running a change step always waits for a person's explicit approval.
+| You are | You get |
+|---|---|
+| A platform lead | One command sets up the same connections and safeguards for every team, project or person, from one file |
+| An engineer | A check of what is installed and signed in on your machine, with the fix for anything missing |
+| A security or compliance lead | Connections to your cloud accounts and Jira that can read but not change anything, and a preview of every change before it is made |
 
-## Install
+## Planned
 
-```
-/plugin marketplace add nnthanh101/1xops
-/plugin install 1xops@1xops
-/1xops:check        # ships with #5 (Sprint 1)
-```
-
-`/1xops:check` lists each configured connector as ready, signed out or missing, and how to fix it. The plugin declares its one dependency (the free base `operations` plugin) in the [plugin manifest](plugins/1xops/).
-
-### Other ways to get 1xops
-
-| Channel | Command | What you get |
+| Outcome | For | Milestone |
 |---|---|---|
-| git | `git clone --recurse-submodules https://github.com/nnthanh101/1xops` | The plugin, plus the upstream base plugins pinned in `upstream/` (`plugins/operations` links to it) |
-| PyPI | `uvx 1xops doctor` | The `1xops` command line ([packages/python](packages/python/)) |
-| npm | `npx 1xops doctor` | The same command line, run through uv ([packages/npm](packages/npm/)) |
-| Container | `docker run --rm -v "$PWD:/work" ghcr.io/nnthanh101/1xops doctor` (or Docker Hub `nnthanh101/1xops`) | The same command line in a container |
+| The top 3 AWS savings, each with \$/month and where the figure came from | CTOs, cloud leads | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| The same for Azure subscriptions | Engineering leads | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| A change request ready for your change board, from a real Terraform plan | Change managers | [v0.4](https://github.com/nnthanh101/1xops/milestone/3) |
+| Last month's AI spend by team and vendor | FinOps leads | [v0.4](https://github.com/nnthanh101/1xops/milestone/3) |
+| Runbooks that wait for a person's yes at each step and keep a record | On-call engineers | [v0.5](https://github.com/nnthanh101/1xops/milestone/4) |
+| The weekly status report, straight from the project board | Delivery leads | [v0.5](https://github.com/nnthanh101/1xops/milestone/4) |
 
-The command line sets up the plugin, settings and read-only connectors for a whole organisation, a team or tenant folder, one project, or one person:
+## Get started
 
 ```bash
-1xops doctor                                              # prerequisites and read-only sign-in
-1xops install --yes                                       # marketplaces + plugin
-1xops config --scope team --connectors aws azure itsm     # shows a diff; add --yes to write
+uvx 1xops doctor          # what is installed and signed in, and how to fix the rest
+uvx 1xops install --yes   # install the plugin
+uvx 1xops setup           # answer a few questions; see every change before it is written
 ```
 
-Connector profiles (`aws`, `azure`, `itsm`) use only the vendors' own servers, pinned to exact versions, in read-only mode where the server offers one. Bring your own profile with `--connectors ./my-profile.json`.
+Also available through npm and as a container image. See [setup](docs/setup.md).
 
-## What it does
+## Your data stays yours
 
-| Capability | For | Status |
-|---|---|---|
-| `/1xops:check`: connector readiness, with exact fixes | Platform engineers | Sprint 1 · [#5](https://github.com/nnthanh101/1xops/issues/5) |
-| `/1xops:cost-check`: top 3 AWS savings, each with \$/month and source, from read-only access | CTOs, cloud leads | Sprint 1 · [#6](https://github.com/nnthanh101/1xops/issues/6) |
-| Same check for Azure subscriptions | Engineering leads | Sprint 2 · [#7](https://github.com/nnthanh101/1xops/issues/7) |
-| CAB-ready change request from a real Terraform plan | Change managers | Sprint 2 · [#8](https://github.com/nnthanh101/1xops/issues/8) |
-| AI spend by team, vendor and seat vs API | FinOps leads | Sprint 3 · [#9](https://github.com/nnthanh101/1xops/issues/9) |
-| Executable runbooks that wait for a yes and leave evidence | On-call engineers | Sprint 4 · [#10](https://github.com/nnthanh101/1xops/issues/10) |
-| Weekly status report from the live project board | Delivery leads | Sprint 5 · [#11](https://github.com/nnthanh101/1xops/issues/11) |
-
-Roadmap: [milestones](https://github.com/nnthanh101/1xops/milestones). Sprints run Monday to Friday.
+- **Read-only connections.** AWS, Azure and Jira/Confluence are connected through each vendor's own server, pinned to a known version. Azure runs in read-only mode, and every Jira or Confluence action asks first.
+- **Nothing changes until you say yes.** Every configuration change is shown first and written only when you confirm.
+- **No secrets in files.** Sign-in stays with AWS SSO, `az login` and Atlassian's own sign-in.
 
 ## Free vs paid
 
-| | 1xops (this repo) | OceanSoft Cloud & AI Operations |
+| | 1xops (this repository) | OceanSoft Cloud & AI Operations |
 |---|---|---|
 | Price | Free, Apache-2.0 | Fixed-price assessment, then monthly |
 | Who runs it | You, on your own systems | OceanSoft, with your team |
-| What you get | Self-serve checks and playbooks | **Assessment:** a read-only review of your AWS, Azure and AI spend, with priced findings, evidence and a 90-day plan. **Managed:** OceanSoft runs and maintains the approved automations, and reports verified savings every month. |
+| What you get | Self-serve setup, checks and playbooks | **Assessment:** a read-only review of your AWS, Azure and AI spend, with priced findings, evidence and a 90-day plan. **Managed:** OceanSoft runs the approved automations and reports verified savings every month. |
 | Where | GitHub | [www.oceansoft.io](https://www.oceansoft.io) · [shop.oceansoft.io](https://shop.oceansoft.io) |
 
-OceanSoft helps NZ and Australian businesses implement and maintain practical AWS, Azure, and AI workflows.
+OceanSoft helps NZ and Australian businesses implement and maintain practical AWS, Azure and AI workflows.
 
 ## Contributing
 
-- Branches: `feature/*` → pull request into `develop`; `main` receives releases only.
-- One capability per pull request, proven on a real asset. Fixtures are for tests only.
-- Setup for users, contributors and releases: [docs/setup.md](docs/setup.md). Decisions: [docs/adr](docs/adr/).
-- Local first: turn on the hooks (`git config core.hooksPath .githooks`) and run the CI with [act](https://github.com/nektos/act) before a pull request: `act pull_request -W .github/workflows/validate.yml`. GitHub Actions runs only for `main`, tags, the monthly upstream bump or by hand.
-- Releases: a `v*` tag on `main` publishes PyPI, npm, ghcr.io and Docker Hub after the maintainer approves.
-- New dependencies: official vendor libraries and servers only; anything third-party needs the maintainer's approval and a line in [NOTICE](NOTICE).
-- Ideas and bugs: [open an issue](https://github.com/nnthanh101/1xops/issues).
+Ideas and bugs: [open an issue](https://github.com/nnthanh101/1xops/issues). To contribute code, start with [setup](docs/setup.md).
 
 ## Licence
 
-Apache-2.0 ([LICENSE](LICENSE)). Copyright, trademarks and every third-party component: [NOTICE](NOTICE).
+Apache-2.0 ([LICENSE](LICENSE)). Copyright, trademarks and third-party components: [NOTICE](NOTICE).
