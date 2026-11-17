@@ -9,12 +9,15 @@
 #     task release [VERSION=x.y.z] STORY=n ship the next version and prove it: tested here first, one approval click
 #   Engineer
 #     task test                            quick tests
+#     task gate                            local first: lint, tests, act, image, ux - before saying done, committing, releasing
 #     task ux                              every command in a real terminal as a first-time customer: checks + screenshots
 #     task ci                              the full check, as it runs on GitHub
 version: '3'
 
 includes:
-  ux: ./tests/Taskfile.yml
+  tests:
+    taskfile: ./tests/Taskfile.yml
+    flatten: true   # task gate, task ux, task lint, task image
 
 vars:
   PY: uv run --project packages/python 1xops
@@ -45,7 +48,7 @@ tasks:
     cmds: [bash scripts/status.sh]
 
   release:
-    desc: 'Owner only: ship the next version (or VERSION), tested here first; proof posted on STORY'
+    desc: 'Owner only: ship the next version (or VERSION); task gate first, then publish, then prove each channel (proof stays in tmp/)'
     interactive: true
     cmds: ['VERSION={{.VERSION}} STORY={{.STORY}} bash scripts/release.sh']
 

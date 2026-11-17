@@ -13,7 +13,8 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.
-- Git: work on `feature/*`, prove it with `task test` and `task ci`, stage it on `develop` (`git merge --squash`),
+- Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
+- Git: work on `feature/*`, prove it with `task gate`, stage it on `develop` (`git merge --squash`),
   delete the branch. The owner commits and pushes. Never commit, push, tag, publish or approve a deployment.
 - Guard rails advise or ask; they never block the owner.
 - Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `read-only-cloud` (plugins/1xops). The identity is the boundary; the rules only ask.
@@ -38,4 +39,5 @@ Commits say `Refs #N`, never `Closes`. Sessions move a story to Approval at most
 | `rich` was removed to make stdout byte-identical, which cost the customer the UX | Byte-identical means the files and piped output. On a terminal, Python uses `rich` to the full (tables, colour, spinner, prompts) and Node.js draws the same natively |
 | Release proof reported registry lag as a product failure, twice | The proof waits for the files an install fetches and retries a channel that printed nothing; it still fails a version that does not exist |
 | A pty capture rendered to SVG was shown as a terminal screenshot | Say what it is. A real screenshot is `screencapture -l` of a Terminal.app or iTerm2 window; without Screen Recording permission, ask the owner to grant it or take it |
+| CI failed on `ruff format --check` because `task test` never ran it and the change was handed over without act | `task gate` runs exactly what CI runs, locally, before every hand-over |
 | A blocking git hook, a GitHub App, two approvals for one release, four tasks for one goal | Least that delivers the outcome; one command, one approval |

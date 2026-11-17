@@ -1,7 +1,11 @@
-# tests/Taskfile.yml - see 1xops as a first-time customer does, before a release. Included as `task ux`.
+# tests/Taskfile.yml - local first: prove a change here, the way CI and a customer will, before anyone else sees it.
+#   task gate   everything CI runs, then the customer's view, in order; stops at the first failure:
+#               lint (ruff check + format check, as CI) → task test → act (the Release workflow's tests) →
+#               the image (act cannot build it) → task ux. Run it before every answer that says "done" and
+#               before every commit; `task release` runs it before anything is pushed.
 #   task ux     build this tree, install it the customer's way in clean containers (non-root, no cloud account),
 #               drive every command in a real terminal, check what tests cannot see, write tmp/ux/report.md and
-#               one screenshot per run. `task release` runs it before anything is pushed.
+#               one screenshot per run.
 version: '3'
 
 vars:
@@ -10,7 +14,33 @@ vars:
     sh: pwd | cksum | cut -d' ' -f1
 
 tasks:
-  default:
+  gate:
+    desc: 'Local first: lint, tests, act, image, UX proof - what CI and a customer will see (stops at the first failure)'
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - task: lint
+      - task: test
+      - echo "gate - act (the Release workflow's tests, as on a pull request; log in tmp/act-gate.log)"
+      - mkdir -p tmp && act pull_request -W .github/workflows/release.yml --rm >tmp/act-gate.log 2>&1 || { tail -30 tmp/act-gate.log; exit 1; }
+      - task: image
+      - task: ux
+      - echo "gate - all passed. Look at tmp/ux/*.svg before calling it done."
+
+  lint:
+    desc: 'ruff check + ruff format --check on src and tests, exactly as CI'
+    dir: '{{.ROOT_DIR}}/packages/python'
+    cmds:
+      - uv run -q --group dev ruff check src tests
+      - uv run -q --group dev ruff format --check src tests
+
+  image:
+    desc: 'Build the container image and run it, as CI (act cannot)'
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - docker build -q -t 1xops:gate-{{.TAG}} packages/python >/dev/null
+      - test "$(docker run --rm 1xops:gate-{{.TAG}} --version)" = "1xops $(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)"
+
+  ux:
     desc: 'UX proof: every 1xops command in a real terminal, checked, with screenshots (tmp/ux)'
     dir: '{{.ROOT_DIR}}'
     cmds:

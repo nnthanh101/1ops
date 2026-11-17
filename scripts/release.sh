@@ -20,16 +20,8 @@ git rev-parse -q --verify "refs/tags/v$V" >/dev/null && { echo "release: v$V alr
 echo "release: v$V (latest released: v${last:-none})"
 
 mkdir -p tmp
-echo "release: local check 1/4, tests"
-task test >/dev/null || { echo "release: tests fail; run task test"; exit 1; }
-echo "release: local check 2/4, the Release workflow's tests with act"
-act pull_request -W .github/workflows/release.yml --rm >tmp/act-release.log 2>&1 || { echo "release: the tests fail under act; see tmp/act-release.log"; exit 1; }
-echo "release: local check 3/4, the image"
-docker build -q --build-arg VERSION="$V" -t "1xops:release-check" packages/python >/dev/null \
-  && [ "$(docker run --rm 1xops:release-check --version)" = "1xops $(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)" ] \
-  || { echo "release: the image does not build or run"; exit 1; }
-echo "release: local check 4/4, every command as a first-time customer sees it (tmp/ux/report.md, screenshots)"
-task ux >tmp/ux-release.log 2>&1 || { echo "release: the UX proof fails; see tmp/ux/report.md"; exit 1; }
+echo "release: local first - task gate (lint, tests, act, image, every command as a customer sees it)"
+task gate >tmp/gate-release.log 2>&1 || { echo "release: task gate fails; see tmp/gate-release.log"; exit 1; }
 
 py=$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
 js=$(node -p "require('./packages/npm/package.json').version")
