@@ -18,6 +18,7 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from one_xops import __version__
 from one_xops import config_file as cf
@@ -269,30 +270,6 @@ def check_connectors(file: str) -> list[tuple[str, str, str]]:
     return rows
 
 
-STYLES = {"bold": (1, 22), "dim": (2, 22), "green": (32, 39), "red": (31, 39), "yellow": (33, 39)}
-
-
-def color(style: str, text: str) -> str:
-    """The same codes as Node.js util.styleText: plain text unless stdout is a terminal."""
-    if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
-        return text
-    on, off = STYLES[style]
-    return f"\x1b[{on}m{text}\x1b[{off}m"
-
-
-def plain_table(title: str, columns: list[str], rows: list[list[str]]) -> None:
-    """The same plain table as the Node.js CLI, so both print the same bytes."""
-    width = [max([len(c), *(len(str(r[i])) for r in rows)]) for i, c in enumerate(columns)]
-
-    def line(cells: list[str]) -> str:
-        return "  ".join(str(c).ljust(width[i]) for i, c in enumerate(cells))
-
-    print(color("bold", title))
-    print(color("dim", line(columns)))
-    for r in rows:
-        print(line(r))
-
-
 RESULT_STYLE = {
     "ok": "green",
     "ready": "green",
@@ -303,25 +280,30 @@ RESULT_STYLE = {
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    rows = check_tools() + check_sign_in(args.aws_profile)
+    # The identity calls take seconds; a spinner on a terminal, nothing when piped.
+    with console.status("Checking tools, sign-ins and connectors (read-only)…"):
+        rows = check_tools() + check_sign_in(args.aws_profile)
+        connectors = check_connectors(args.file)
     shown = [
-        [
+        (
             name,
             "required" if required else "optional",
             "ok" if ok else ("missing" if required else "check"),
-            scrub(detail),
-        ]
+            detail,
+        )
         for name, required, ok, detail in rows
     ]
-    shown += [
-        [name, "connector", status, scrub(fix)] for name, status, fix in check_connectors(args.file)
-    ]
-    for r in shown:
-        r[2] = color(RESULT_STYLE[r[2]], r[2])
-    plain_table(f"1xops {__version__} doctor", ["check", "needed", "result", "detail"], shown)
+    shown += [(name, "connector", status, fix) for name, status, fix in connectors]
+    table = Table(title=f"1xops {__version__} doctor", title_style="bold")
+    for col in ("check", "needed", "result", "detail"):
+        table.add_column(col, overflow="fold")
+    for name, needed, result, detail in shown:
+        style = RESULT_STYLE[result]
+        table.add_row(name, needed, Text(result, style=style), Text(scrub(detail)))
+    console.print(table)
     failed = [r[0] for r in rows if r[1] and not r[2]]
     if failed:
-        print(color("red", f"Required: {', '.join(failed)}"))
+        console.print(Text(f"Required: {', '.join(failed)}", style="red"))
         return 1
     return 0
 

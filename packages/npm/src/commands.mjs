@@ -1,8 +1,9 @@
 // The 1xops commands: doctor, install, config, env, profiles, setup. Same behaviour as the Python
 // package (packages/python/src/one_xops/cli.py and setup.py). Nothing changes unless --yes is given.
 import { spawnSync } from 'node:child_process';
-import { accessSync, constants, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import path, { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { styleText } from 'node:util';
 import * as cf from './config-file.mjs';
@@ -41,12 +42,20 @@ export function accessFromRole(arn = '') {
 }
 const ACCESS = { read: 'read-only', write: 'can change things: use a read-only role', unknown: 'access unknown: use a read-only role' };
 
+// The same look as the Python CLI's rich table: a heavy header, light rows, colour on a terminal. No dependency.
+const visible = (s) => String(s).replace(/\x1b\[[0-9;]*m/g, '').length;
 function table(title, columns, rows) {
-  const width = columns.map((c, i) => Math.max(c.length, ...rows.map((r) => String(r[i]).length)));
-  const line = (cells) => cells.map((c, i) => String(c).padEnd(width[i])).join('  ');
-  console.log(color('bold', title));
-  console.log(color('dim', line(columns)));
-  for (const r of rows) console.log(line(r));
+  const width = columns.map((c, i) => Math.max(c.length, ...rows.map((r) => visible(r[i]))));
+  const cells = (r, bar) => `${bar} ${r.map((c, i) => String(c) + ' '.repeat(width[i] - visible(c))).join(` ${bar} `)} ${bar}`;
+  const rule = (l, m, r, h) => l + width.map((w) => h.repeat(w + 2)).join(m) + r;
+  const total = width.reduce((a, w) => a + w + 3, 1);
+  const left = Math.max(0, Math.floor((total - title.length) / 2));
+  console.log(' '.repeat(left) + color('bold', title) + ' '.repeat(Math.max(0, total - left - title.length)));
+  console.log(rule('┏', '┳', '┓', '━'));
+  console.log(cells(columns.map((c) => color('bold', c)), '┃'));
+  console.log(rule('┡', '╇', '┩', '━'));
+  for (const r of rows) console.log(cells(r, '│'));
+  console.log(rule('└', '┴', '┘', '─'));
 }
 
 // ── doctor ──────────────────────────────────────────────────────────────────
@@ -155,9 +164,14 @@ export function checkConnectors(file) {
 const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow' };
 
 export function doctor(opts, version) {
+  // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
+  const tty = process.stdout.isTTY;
+  if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
   const rows = [...checkTools(), ...checkSignIn(opts['aws-profile'])];
+  const connectors = checkConnectors(opts.file);
+  if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
-  shown.push(...checkConnectors(opts.file).map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
+  shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
   for (const r of shown) r[2] = color(RESULT_STYLE[r[2]], r[2]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
   const failed = rows.filter((r) => r[1] && !r[2]).map((r) => r[0]);
@@ -344,7 +358,8 @@ function detect() {
   if (profilesOut.code === 0 && profilesOut.out) found.awsProfiles = profilesOut.out.split(/\s+/);
   const region = process.env.AWS_REGION || (ok('aws', ['configure', 'get', 'region']).code === 0 ? ok('aws', ['configure', 'get', 'region']).out : '');
   if (region) found.AWS_REGION = region;
-  const az = ok('az', ['account', 'show', '--query', '{t:tenantId,s:id}', '--output', 'json']);
+  // Azure IDs are read only from a separate read-only identity (AZURE_CONFIG_DIR), never the default login.
+  const az = process.env.AZURE_CONFIG_DIR ? ok('az', ['account', 'show', '--query', '{t:tenantId,s:id}', '--output', 'json']) : { code: 1, out: '' };
   if (az.code === 0 && az.out) {
     try {
       const ids = JSON.parse(az.out);
@@ -353,6 +368,32 @@ function detect() {
     } catch { /* not JSON */ }
   }
   return found;
+}
+
+// (name, masked account, role) of AWS profiles whose configured role cannot change things. Read from the local AWS
+// config only: no cloud call. Unknown and can-change profiles are left out.
+export function readOnlyProfiles() {
+  const cfg = process.env.AWS_CONFIG_FILE || join(homedir(), '.aws', 'config');
+  if (!existsSync(cfg)) return [];
+  const found = [];
+  let name = '';
+  let kv = {};
+  const flush = () => {
+    const arn = kv.role_arn ?? '';
+    const role = kv.sso_role_name || arn.split('/').pop();
+    if (name && role && accessFromRole(`:assumed-role/${role}/`) === 'read') {
+      const acct = kv.sso_account_id || arn.split(':')[4] || '';
+      found.push([name, acct ? `****${acct.slice(-4)}` : '-', role]);
+    }
+  };
+  for (const raw of readFileSync(cfg, 'utf8').split('\n')) {
+    const line = raw.trim();
+    const m = line.match(/^\[(?:profile\s+)?([^\]]+)\]/);
+    if (m) { flush(); name = m[1].trim(); kv = {}; }
+    else if (line.includes('=') && !/^[#;]/.test(line)) { const i = line.indexOf('='); kv[line.slice(0, i).trim()] = line.slice(i + 1).trim(); }
+  }
+  flush();
+  return found.sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
 export async function setup(opts) {
@@ -383,7 +424,20 @@ export async function setup(opts) {
       if (!(await yes(`Add ${name}: ${profile.description ?? ''}?`, false))) continue;
       const values = {};
       for (const v of cf.variables(profile)) {
-        if (v.endsWith('_PROFILE') && found.awsProfiles) console.log(`  AWS profiles on this machine: ${found.awsProfiles.join(', ')}`);
+        if (v.endsWith('_PROFILE')) {
+          // Pick a read-only AWS profile by number. No typing: a mistyped or admin profile cannot get in.
+          const options = readOnlyProfiles();
+          if (!options.length) {
+            console.log(`  ${v}: no read-only AWS profile found in ~/.aws/config. Create one (an SSO role such as ReadOnlyAccess) with: aws configure sso. This connector will show as missing in /1xops:check until then.`);
+            continue;
+          }
+          console.log(`  ${v}: read-only profiles only`);
+          options.forEach(([n, acct, role], i) => console.log(`    ${i + 1}) ${n}  ${acct}  ${role}`));
+          let pick;
+          do pick = await ask('  Number (Enter to skip)'); while (pick && !(Number(pick) >= 1 && Number(pick) <= options.length));
+          if (pick) values[v] = options[Number(pick) - 1][0];
+          continue;
+        }
         const value = await ask(`  ${v} (blank to skip)`, process.env[v] || found[v] || '');
         if (value) values[v] = value;
       }

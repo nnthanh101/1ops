@@ -60,9 +60,11 @@ done
 echo "release: approve the 'release' environment once: https://github.com/$R/actions/runs/$run"
 gh run watch "$run" -R $R --exit-status >/dev/null || { echo "release: the Release run failed; see the link above"; exit 1; }
 
-# The registries need a moment to serve a new version everywhere; prove only once both answer for it (up to 5 min).
+# The registries need a moment to serve a new version everywhere. Prove only once the files a customer's install
+# fetches answer: PyPI's simple index (what uv and pip read) and the npm tarball. Their JSON APIs answer first (up to 5 min).
 for _ in $(seq 30); do
-  curl -sf "https://pypi.org/pypi/1xops/$V/json" >/dev/null && curl -sf "https://registry.npmjs.org/1xops/$V" >/dev/null && break
+  curl -sf -H 'Accept: application/vnd.pypi.simple.v1+json' https://pypi.org/simple/1xops/ | grep -q "\"$V\"" \
+    && curl -sfI "https://registry.npmjs.org/1xops/-/1xops-$V.tgz" >/dev/null && break
   sleep 10
 done
 proof=tmp/evidence-$V.md

@@ -51,7 +51,7 @@ tasks:
       - uv run --project packages/python --group dev pytest -q packages/python/tests
       - npm test --prefix packages/npm --silent
       # Python and Node.js print the same bytes, on this machine's real tools (a check that printed nothing fails)
-      - mkdir -p tmp && uv run -q --project packages/python 1xops doctor >tmp/doctor-py.txt 2>&1; echo "exit $?" >>tmp/doctor-py.txt; node packages/npm/bin/1xops.mjs doctor >tmp/doctor-js.txt 2>&1; echo "exit $?" >>tmp/doctor-js.txt; test "$(wc -l <tmp/doctor-py.txt)" -gt 2 && cmp tmp/doctor-py.txt tmp/doctor-js.txt
+      - mkdir -p tmp && COLUMNS=200 uv run -q --project packages/python 1xops doctor >tmp/doctor-py.txt 2>&1; echo "exit $?" >>tmp/doctor-py.txt; node packages/npm/bin/1xops.mjs doctor >tmp/doctor-js.txt 2>&1; echo "exit $?" >>tmp/doctor-js.txt; test "$(wc -l <tmp/doctor-py.txt)" -gt 2 && cmp tmp/doctor-py.txt tmp/doctor-js.txt
 
   ci:
     desc: The full check, as it runs on GitHub

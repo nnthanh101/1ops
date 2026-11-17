@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -37,17 +38,77 @@ def detect() -> dict[str, str | list[str]]:
     region = os.environ.get("AWS_REGION") or _out(["aws", "configure", "get", "region"])
     if region:
         found["AWS_REGION"] = region
-    account = _out(["az", "account", "show", "--query", "{t:tenantId,s:id}", "--output", "json"])
-    if account:
-        ids = json.loads(account)
-        found["AZURE_TENANT_ID"], found["AZURE_SUBSCRIPTION_ID"] = ids["t"], ids["s"]
+    # Azure IDs are read only from a separate read-only identity (AZURE_CONFIG_DIR), never the default login.
+    if os.environ.get("AZURE_CONFIG_DIR"):
+        account = _out(
+            ["az", "account", "show", "--query", "{t:tenantId,s:id}", "--output", "json"]
+        )
+        if account:
+            ids = json.loads(account)
+            found["AZURE_TENANT_ID"], found["AZURE_SUBSCRIPTION_ID"] = ids["t"], ids["s"]
     return found
 
 
+def read_only_profiles() -> list[tuple[str, str, str]]:
+    """(name, masked account, role) of AWS profiles whose configured role cannot change things.
+    Read from the local AWS config only: no cloud call. Unknown and can-change profiles are left out."""
+    from one_xops import cli  # imported here: cli imports this module
+
+    cfg = Path(os.environ.get("AWS_CONFIG_FILE") or Path.home() / ".aws" / "config")
+    if not cfg.is_file():
+        return []
+    found: list[tuple[str, str, str]] = []
+    name, kv = "", {}
+
+    def flush() -> None:
+        role = kv.get("sso_role_name") or (kv.get("role_arn", "").split("/")[-1])
+        if name and role and cli.access_from_role(f":assumed-role/{role}/") == "read":
+            acct = (
+                kv.get("sso_account_id")
+                or kv.get("role_arn", "").split(":")[4:5]
+                and kv["role_arn"].split(":")[4]
+            )
+            found.append((name, f"****{acct[-4:]}" if acct else "-", role))
+
+    for raw in cfg.read_text().splitlines():
+        line = raw.strip()
+        m = re.match(r"\[(?:profile\s+)?([^\]]+)\]", line)
+        if m:
+            flush()
+            name, kv = m.group(1).strip(), {}
+        elif "=" in line and not line.startswith(("#", ";")):
+            k, v = line.split("=", 1)
+            kv[k.strip()] = v.strip()
+    flush()
+    return sorted(found, key=lambda x: (x[1], x[0]))
+
+
+def ask_profile(var: str) -> str:
+    """Pick a read-only AWS profile by number. No typing: a mistyped or admin profile cannot get in."""
+    options = read_only_profiles()
+    if not options:
+        console.print(
+            f"  {var}: no read-only AWS profile found in ~/.aws/config. Create one (an SSO role such as ReadOnlyAccess) "
+            "with: aws configure sso. This connector will show as missing in /1xops:check until then."
+        )
+        return ""
+    console.print(f"  {var}: read-only profiles only")
+    for i, (name, acct, role) in enumerate(options, 1):
+        console.print(f"    {i}) {name}  {acct}  {role}", markup=False, highlight=False)
+    pick = Prompt.ask(
+        "  Number (Enter to skip)",
+        choices=[str(i) for i in range(1, len(options) + 1)] + [""],
+        default="",
+        show_default=False,
+        show_choices=False,
+    )
+    return options[int(pick) - 1][0] if pick else ""
+
+
 def ask_value(var: str, found: dict) -> str:
+    if var.endswith("_PROFILE"):
+        return ask_profile(var)
     default = os.environ.get(var) or found.get(var)
-    if var.endswith("_PROFILE") and found.get("aws_profiles"):
-        console.print(f"  AWS profiles on this machine: {', '.join(found['aws_profiles'])}")
     return Prompt.ask(f"  {var} (blank to skip)", default=default or "", show_default=bool(default))
 
 
