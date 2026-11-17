@@ -1,11 +1,11 @@
 {
-  "name": "1xops",
+  "name": "1ops",
   "owner": {
     "name": "Nhat-Thanh Nguyen",
     "email": "nnthanh101@gmail.com"
   },
   "metadata": {
-    "description": "1xops by OceanSoft.io — Cloud & AI Operations. Free, open source (Apache-2.0)."
+    "description": "1xops free edition by OceanSoft.io: /1xops:check. Free, open source (Apache-2.0). Enterprise: marketplace 1xops."
   },
   "plugins": [
     {

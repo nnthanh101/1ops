@@ -10,19 +10,34 @@
 
 ```
 /plugin marketplace add nnthanh101/1xops
-/plugin install 1xops@1xops
+/plugin install 1xops@1ops
 ```
 
 ## Commands
 
-| Command | What it does | Status |
+One namespace for free and enterprise: every command and skill is `/1xops:<name>`. Install one source or the other; the names never change.
+
+| Command | What it does | Edition |
 |---|---|---|
-| `/1xops:check` | Lists each connector as ready, signed out or missing, with the fix; runs `1xops doctor` | Available |
-| `/1xops:cost-check` | Top AWS (later Azure) savings with \$/month and source | Sprint 1–2 |
-| `/1xops:change-request` | CAB-ready change request from `terraform show -json` | Sprint 2 |
-| `/1xops:ai-spend` | AI spend by team, vendor and seat vs API | Sprint 3 |
-| `/1xops:runbook` | Executable runbook with per-step approval and evidence | Sprint 4 |
-| `/1xops:status` | Weekly status from a live project board | Sprint 5 |
+| `/1xops:check` | Each connector as ready, signed out or missing, with the exact fix; runs `1xops doctor` | Free (this repository) |
+| `/1xops:cost-check` | Top AWS and Azure savings, each with \$/month and its source | Enterprise |
+| `/1xops:change-request` | A change request ready for your change board, from `terraform show -json` | Enterprise |
+| `/1xops:ai-spend` | AI spend by team, vendor, and seat vs API | Enterprise |
+| `/1xops:runbook` | A runbook with a person's yes at each step, and evidence | Enterprise |
+| `/1xops:status` | The weekly status, from a live project board | Enterprise |
+| `/1xops:read-only-cloud` (skill) | Keeps AWS and Azure work read-only: checks access first, proposes any change | Enterprise |
+
+### Naming convention
+
+| Rule | Example |
+|---|---|
+| Every command and skill is `/1xops:<name>` | `/1xops:check` |
+| `<name>` is the outcome the user gets: lowercase kebab-case, 1–2 words | `cost-check`, `change-request` |
+| No edition, vendor or version in the name | not `/1xops:pro-cost`, not `/1xops:aws-cost-v2` |
+| A skill is named for the rule it enforces | `/1xops:read-only-cloud` |
+| A shipped name never changes meaning | `check` is the same command in both editions |
+
+Free: marketplace `1ops` (this repository), `/plugin install 1xops@1ops`. Enterprise: marketplace `1xops` (private `1xOps/1xops-enterprise`), `/plugin install 1xops@1xops`: the same `1xops` plugin with every command above. Install one edition.
 
 ## Connectors
 

@@ -226,7 +226,7 @@ export function doctor(opts, version) {
 const INSTALL_STEPS = [
   [s.HOST, 'plugin', 'marketplace', 'add', 'anthropics/knowledge-work-plugins'],
   [s.HOST, 'plugin', 'marketplace', 'add', 'nnthanh101/1xops'],
-  [s.HOST, 'plugin', 'install', '1xops@1xops'],
+  [s.HOST, 'plugin', 'install', '1xops@1ops'],
 ];
 
 export function install(opts) {

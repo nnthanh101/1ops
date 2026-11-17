@@ -11,11 +11,11 @@ def test_merge_keeps_user_values_and_adds_missing():
     existing = {
         "model": "x",
         "permissions": {"deny": ["Read(./secrets)"]},
-        "enabledPlugins": {"1xops@1xops": False},
+        "enabledPlugins": {"1xops@1ops": False},
     }
     merged = s.merge(existing, s.BASELINE)
     assert merged["model"] == "x"
-    assert merged["enabledPlugins"]["1xops@1xops"] is False  # the user's choice wins
+    assert merged["enabledPlugins"]["1xops@1ops"] is False  # the user's choice wins
     assert merged["permissions"]["deny"][0] == "Read(./secrets)"
     assert "Read(./.env)" in merged["permissions"]["deny"]
     assert s.merge(merged, s.BASELINE) == merged  # idempotent
@@ -73,7 +73,7 @@ def test_team_write_then_rerun_is_noop(tmp_path: Path):
     ]
     assert cli.main(args) == 0
     settings = json.loads((tmp_path / ".claude" / "settings.json").read_text())
-    assert settings["enabledPlugins"]["1xops@1xops"] is True
+    assert settings["enabledPlugins"]["1xops@1ops"] is True
     mcp = json.loads((tmp_path / ".mcp.json").read_text())["mcpServers"]
     assert "mine" in mcp and "awslabs-cloudtrail" in mcp and "atlassian" in mcp
     assert "mcp__atlassian__*" in settings["permissions"]["ask"]  # every Jira/Confluence call asks

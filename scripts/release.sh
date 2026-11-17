@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# VERSION=x.y.z STORY=n release.sh (both optional) - ship a version and prove it, as one command. Owner only: it commits
-# the version bump, merges into main and pushes a tag, and running it is the owner's yes. VERSION defaults to the next
-# patch after the latest tag. Local first: the tests, the Release workflow's tests (act) and the image build run on this
+# [BUMP=patch|minor|major] [VERSION=x.y.z] STORY=n release.sh (all optional) - ship a version and prove it, as one command. Owner only: it commits
+# the version bump, merges into main and pushes a tag, and running it is the owner's yes. VERSION defaults to the latest
+# published version + 1. Local first: the tests, the Release workflow's tests (act) and the image build run on this
 # machine before anything is pushed. Then it merges develop into main once green, tags vVERSION, waits for the owner's one
 # approval and the publish, installs the release from every channel in clean containers, and keeps that proof in tmp/
 # (never posted: proof output can carry customer or tenant names). STORY only tags the version commit.
@@ -10,13 +10,14 @@ set -euo pipefail
 R=nnthanh101/1xops
 cd "$(git rev-parse --show-toplevel)"
 git fetch -q origin --tags
-last=$(git tag --list 'v*' --sort=-v:refname | head -1); last=${last#v}
-V=${VERSION:-$(echo "${last:-0.0.0}" | awk -F. '{print $1"."$2"."$3+1}')}
+last=$(npm view 1xops version 2>/dev/null || echo 0.0.0)  # the latest published version
+# Next version = latest published + 1, by SemVer: BUMP=patch (default: fixes, UX), minor (a new command or
+# capability), major (a breaking change to commands, files or settings).
+V=${VERSION:-$(echo "$last" | awk -F. -v b="${BUMP:-patch}" '{ if (b=="major") print $1+1".0.0"; else if (b=="minor") print $1"."$2+1".0"; else print $1"."$2"."$3+1 }')}
 STORY=${STORY:-}
 [ "$(git branch --show-current)" = develop ] || { echo "release: run it on develop"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "release: commit or stash your changes first"; exit 1; }
 [ "$(git rev-parse origin/develop)" = "$(git rev-parse HEAD)" ] || { echo "release: this clone is not at origin/develop; pull or push first"; exit 1; }
-git rev-parse -q --verify "refs/tags/v$V" >/dev/null && { echo "release: v$V already exists"; exit 1; }
 echo "release: v$V (latest released: v${last:-none})"
 
 mkdir -p tmp
