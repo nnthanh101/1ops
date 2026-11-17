@@ -17,7 +17,12 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Git: work on `feature/*`, prove it with `task gate`, stage it on `develop` (`git merge --squash`),
   delete the branch. The owner commits and pushes. Never commit, push, tag, publish or approve a deployment.
 - Guard rails advise or ask; they never block the owner.
-- Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `read-only-cloud` (plugins/1xops). The identity is the boundary; the rules only ask.
+- Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `/1xops:read-only-cloud` (enterprise edition). The identity is the boundary; the rules only ask.
+
+## Commands: one namespace
+Every command and skill is `/1xops:<name>`, free or enterprise; `<name>` is the outcome in kebab-case, never the edition,
+vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` only. Everything else lives
+in the same-named `1xops` plugin in the private `1xOps/1xops-enterprise` marketplace. Table: `plugins/1xops/README.md`.
 
 ## Release standard
 SemVer, tag `vX.Y.Z`, one version for PyPI, npm and the image. Next version = latest published + 1:
