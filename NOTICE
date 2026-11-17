@@ -3,7 +3,7 @@ Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io
 
 Licensed under the Apache License, Version 2.0 (see LICENSE). This NOTICE and that
 LICENSE cover the whole repository: the plugin (plugins/1xops), the command line
-(packages/python, PyPI "1xops"), the npm launcher (packages/npm, npm "1xops") and the
+(packages/python, PyPI "1xops"), the native Node.js command line (packages/npm, npm "1xops") and the
 container image (ghcr.io and Docker Hub "nnthanh101/1xops").
 
 "1xops" and "OceanSoft" are trademarks of OceanSoft.io. The Apache License does not
@@ -21,7 +21,6 @@ Upstream (git submodule, upstream/knowledge-work-plugins; plugins/operations lin
 
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT
-  PyYAML 6.0.3             https://github.com/yaml/pyyaml                         MIT
 
 Build, test and run tools (not distributed)
   uv 0.13.8                https://github.com/astral-sh/uv                        MIT OR Apache-2.0

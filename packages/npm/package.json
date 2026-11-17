@@ -1,13 +1,18 @@
 {
   "name": "1xops",
-  "version": "0.2.1",
-  "description": "1xops by OceanSoft.io: runs the 1xops command line (doctor, install, config) through uv.",
+  "version": "0.2.2",
+  "description": "1xops by OceanSoft.io: set up the 1xops plugin, settings and read-only cloud connectors for an organisation, team or person. Native Node.js, no dependencies.",
   "license": "Apache-2.0",
   "author": "Nhat-Thanh Nguyen <nnthanh101@gmail.com> (https://www.oceansoft.io)",
   "homepage": "https://www.oceansoft.io",
   "repository": { "type": "git", "url": "git+https://github.com/nnthanh101/1xops.git", "directory": "packages/npm" },
   "bugs": "https://github.com/nnthanh101/1xops/issues",
-  "bin": { "1xops": "bin/1xops.js" },
-  "files": ["bin/", "README.md"],
-  "engines": { "node": ">=24" }
+  "type": "module",
+  "bin": { "1xops": "bin/1xops.mjs" },
+  "files": ["bin", "src", "profiles", "README.md"],
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test --test-reporter=spec",
+    "prepack": "rm -rf profiles && mkdir profiles && cp ../python/src/one_xops/profiles/*.json profiles/"
+  }
 }

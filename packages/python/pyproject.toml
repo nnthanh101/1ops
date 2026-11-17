@@ -1,6 +1,6 @@
 [project]
 name = "1xops"
-version = "0.2.1"
+version = "0.2.2"
 description = "1xops by OceanSoft.io: set up the 1xops plugin, settings and read-only cloud connectors for an organisation, team or person."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: System :: Systems Administration",
 ]
-dependencies = ["pyyaml>=6.0.3", "rich>=15.0.0"]
+dependencies = ["rich>=15.0.0"]
 
 [project.urls]
 Homepage = "https://www.oceansoft.io"

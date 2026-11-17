@@ -1,4 +1,4 @@
-"""`1xops setup`: a guided terminal setup that writes 1xops.yaml, then shows and applies the changes."""
+"""`1xops setup`: a guided terminal setup that writes .env.1xops, then shows and applies the changes."""
 
 from __future__ import annotations
 
