@@ -1,6 +1,6 @@
 name: Validate
 
-# The marketplace and every plugin validate in strict mode with the pinned Claude Code CLI.
+# The marketplace and every plugin validate in strict mode with the pinned CLI.
 on:
   pull_request:
   push:
