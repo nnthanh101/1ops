@@ -19,6 +19,11 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Guard rails advise or ask; they never block the owner.
 - Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `read-only-cloud` (plugins/1xops). The identity is the boundary; the rules only ask.
 
+## Release standard
+SemVer, tag `vX.Y.Z`, one version for PyPI, npm and the image. Next version = latest published + 1:
+`task release STORY=n` is a patch (fixes, UX); `BUMP=minor` adds a command or capability; `BUMP=major` breaks a
+command, file or setting. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`) and say `Refs #N`.
+
 ## Definition of done
 A criterion is done only when it is proven end to end as a customer: the published package, installed and operated
 in a real terminal (Terminal.app or iTerm2, screenshots with `screencapture`), read-only sign-ins and read-only
