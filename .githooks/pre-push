@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pre-push: every branch except develop and main is proven locally before it reaches GitHub, because GitHub Actions
-# runs only for develop and main. It runs the Validate workflow with act, and builds the image act cannot build.
+# runs only for develop and main. It runs the tests of the Release workflow with act, and builds the image act cannot build.
 # Advice only: it names what failed and how to rerun it, then lets the push go ahead. The person decides.
 # Turned on per clone by `git config core.hooksPath .githooks`. `bash .githooks/pre-push --self-test` proves it.
 set -uo pipefail
@@ -25,11 +25,11 @@ needs_local_ci "$branch" || exit 0
 command -v act >/dev/null 2>&1 && docker info >/dev/null 2>&1 || {
   echo "pre-push: advice - $branch was not checked locally: act and a running Docker are needed (brew install act; start Docker). The push goes ahead."; exit 0; }
 
-echo "pre-push: checking $branch locally (act: Validate, then the image)"
+echo "pre-push: checking $branch locally (act: the Release workflow's tests, then the image)"
 log=$(mktemp); trap 'rm -f "$log"' EXIT
-if ! (cd "$root" && act pull_request -W .github/workflows/validate.yml --rm >"$log" 2>&1); then
+if ! (cd "$root" && act pull_request -W .github/workflows/release.yml --rm >"$log" 2>&1); then
   grep -E "Job (succeeded|failed)|❌|::error" "$log" | tail -12
-  echo "pre-push: advice - Validate failed locally; the push goes ahead. Rerun: act pull_request -W .github/workflows/validate.yml"
+  echo "pre-push: advice - the tests failed locally; the push goes ahead. Rerun: act pull_request -W .github/workflows/release.yml"
   exit 0
 fi
 grep -E "Job succeeded" "$log" | sort -u

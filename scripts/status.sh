@@ -18,5 +18,5 @@ gh issue list -R $R --state all --limit 50 --json number,title,state,comments \
 echo
 echo "Product health: full check on develop and main (latest run)"
 for b in develop main; do
-  gh run list -R $R -w validate.yml -b "$b" -L 1 --json conclusion,createdAt --jq ".[] | \"  $b: \(.conclusion // \"running\") (\(.createdAt[0:16]))\""
+  gh run list -R $R -w release.yml -b "$b" -L 1 --json conclusion,createdAt --jq ".[] | \"  $b: \(.conclusion // \"running\") (\(.createdAt[0:16]))\""
 done

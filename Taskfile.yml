@@ -53,4 +53,4 @@ tasks:
 
   ci:
     desc: The full check, as it runs on GitHub
-    cmds: [act pull_request -W .github/workflows/validate.yml --rm]
+    cmds: [act pull_request -W .github/workflows/release.yml --rm]

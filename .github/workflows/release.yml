@@ -1,27 +1,123 @@
 name: Release
 
-# Publishes PyPI, npm and Docker Hub from a v* tag on main, after a named approver
-# accepts the `release` environment. The same jobs run locally with act:
-#   act workflow_dispatch -W .github/workflows/release.yml --secret-file .secrets   (owner only)
+# One workflow: every pull request and push to develop or main is tested; a v* tag on main is tested again on that
+# exact commit and, after one approval of the `release` environment, published to PyPI, npm, Docker Hub and ghcr.io.
+# GitHub runs it for develop, main and v* tags only; other branches are tested locally with act (.githooks/pre-push).
+#   act pull_request -W .github/workflows/release.yml                      tests only, as on a pull request
+#   act workflow_dispatch -W .github/workflows/release.yml --secret-file .secrets   publish from this machine (owner only)
 # Secrets (set by the owner, never committed):
 #   PYPI_TOKEN       only for act; on GitHub, PyPI trusted publishing (OIDC) is used
 #   NPM_TOKEN        first release only; empty → npm trusted publishing (OIDC). See docs/adr/0002
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN   Docker Hub mirror (waiver in docs/adr/0002)
 # ghcr.io uses the automatic, short-lived GITHUB_TOKEN.
 on:
+  pull_request:
+    branches: [develop, main]
   push:
+    branches: [develop, main]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions: {}
 
 concurrency:
-  group: release
-  cancel-in-progress: false
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }} # never cancel a publish
 
 jobs:
+  test-plugin:
+    name: "Test: plugin"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !env.ACT }} # act: the runner image's own Node
+        with:
+          node-version: 24
+      - name: Strict validation with the pinned validator
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/v" @anthropic-ai/claude-code@2.1.325
+          # npm 12 holds install scripts until approved: run this one pinned package's own script
+          node "$RUNNER_TEMP/v/node_modules/@anthropic-ai/claude-code/install.cjs"
+          v="$RUNNER_TEMP/v/node_modules/.bin/claude"
+          "$v" plugin validate --strict .
+          "$v" plugin validate --strict plugins/1xops
+      - name: Upstream link resolves
+        run: test -f plugins/operations/.claude-plugin/plugin.json
+
+  test-python:
+    name: "Test: Python"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: packages/python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: uv sync --locked --group dev
+      - run: uv run ruff check src tests && uv run ruff format --check src tests
+      - run: uv run pytest -q
+      - run: uv build
+      - name: Wheel runs
+        run: uv run --isolated --with dist/*.whl 1xops --version
+
+  test-npm:
+    name: "Test: Node.js"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: packages/npm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !env.ACT }} # act: the runner image's own Node
+        with:
+          node-version: 24
+      - name: Versions match
+        run: |
+          py=$(grep -E '^version = ' ../python/pyproject.toml | cut -d'"' -f2)
+          js=$(node -p "require('./package.json').version")
+          test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
+      - name: Tests (native Node.js, no dependencies)
+        run: npm test
+      - run: npm pack --dry-run
+
+  test-image:
+    name: "Test: image"
+    if: ${{ !github.event.act }} # act: no Docker CLI in the runner image; pre-push and task release build it locally
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t 1xops:ci packages/python
+      - run: docker run --rm 1xops:ci --version
+
+  # Publishing starts here: only for a v* tag (or by hand), and only after every test passed on this commit.
   check:
     name: Check version
+    needs: [test-plugin, test-python, test-npm, test-image]
+    # test-image is skipped under act; skipped is fine, a failure is not
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:

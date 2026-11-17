@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# VERSION=x.y.z STORY=n release.sh (both optional) - ship a version and prove it, as one command (owner only: it commits the version bump,
-# merges into main and pushes a tag, each after the owner's yes or the green checks). VERSION defaults to the next patch
-# after the latest tag. Local first: the tests, the Validate workflow (act) and the image build run on this machine
-# before anything is pushed. Then it merges develop into main once green, tags vVERSION, waits for the owner's one
+# VERSION=x.y.z STORY=n release.sh (both optional) - ship a version and prove it, as one command. Owner only: it commits
+# the version bump, merges into main and pushes a tag, and running it is the owner's yes. VERSION defaults to the next
+# patch after the latest tag. Local first: the tests, the Release workflow's tests (act) and the image build run on this
+# machine before anything is pushed. Then it merges develop into main once green, tags vVERSION, waits for the owner's one
 # approval and the publish, installs the release from every channel in clean containers, and posts that proof on STORY.
 # Used by `task release`.
 set -euo pipefail
@@ -21,8 +21,8 @@ echo "release: v$V (latest released: v${last:-none})"
 mkdir -p tmp
 echo "release: local check 1/3, tests"
 task test >/dev/null || { echo "release: tests fail; run task test"; exit 1; }
-echo "release: local check 2/3, the Validate workflow with act"
-act pull_request -W .github/workflows/validate.yml --rm >tmp/act-release.log 2>&1 || { echo "release: Validate fails locally; see tmp/act-release.log"; exit 1; }
+echo "release: local check 2/3, the Release workflow's tests with act"
+act pull_request -W .github/workflows/release.yml --rm >tmp/act-release.log 2>&1 || { echo "release: the tests fail under act; see tmp/act-release.log"; exit 1; }
 echo "release: local check 3/3, the image"
 docker build -q --build-arg VERSION="$V" -t "1xops:release-check" packages/python >/dev/null \
   && [ "$(docker run --rm 1xops:release-check --version)" = "1xops $(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)" ] \
@@ -32,11 +32,11 @@ py=$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
 js=$(node -p "require('./packages/npm/package.json').version")
 if [ "$py" != "$V" ] || [ "$js" != "$V" ]; then
   sed -i.bak -E "s/^version = \"[^\"]+\"/version = \"$V\"/" packages/python/pyproject.toml && rm packages/python/pyproject.toml.bak
-  npm pkg set version="$V" --prefix packages/npm
+  # only the version line changes; npm pkg set would reflow the whole file
+  node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.argv[2]}"`))' packages/npm/package.json "$V"
   uv lock --project packages/python -q
   git --no-pager diff --stat
-  read -r -p "release: commit and push the version bump $py -> $V to develop? [y/N] " ok
-  [ "$ok" = y ] || { git checkout -- packages/python/pyproject.toml packages/python/uv.lock packages/npm/package.json; echo "release: stopped; nothing pushed"; exit 1; }
+  echo "release: version $py -> $V, committed and pushed to develop"
   git commit -q -m "chore: release v$V${STORY:+ (Refs #$STORY)}" packages/python/pyproject.toml packages/python/uv.lock packages/npm/package.json
   git push -q origin develop
 fi
