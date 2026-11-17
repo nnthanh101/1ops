@@ -30,11 +30,41 @@ if (
 ):  # piped (the assistant, evidence): size to content, never wrap like a terminal
     console = Console(width=400)
 
+# Installing an edition replaces the other (or the free edition under its old marketplace name, 1xops).
 INSTALL_STEPS = [
     [s.HOST, "plugin", "marketplace", "add", "anthropics/knowledge-work-plugins"],
+    [s.HOST, "plugin", "uninstall", "1xops@1xops"],
+    [s.HOST, "plugin", "marketplace", "remove", "1xops"],
     [s.HOST, "plugin", "marketplace", "add", "nnthanh101/1xops"],
     [s.HOST, "plugin", "install", "1xops@1ops"],
 ]
+SHOP = "https://shop.oceansoft.io"
+
+
+def enterprise_steps(folder: str) -> list[list[str]]:
+    """Free edition out, enterprise in: the same plugin name 1xops, from the unpacked bundle as marketplace 1xops."""
+    return [
+        [s.HOST, "plugin", "marketplace", "add", "anthropics/knowledge-work-plugins"],
+        [s.HOST, "plugin", "uninstall", "1xops@1ops"],
+        [s.HOST, "plugin", "marketplace", "remove", "1xops"],
+        [s.HOST, "plugin", "marketplace", "add", folder],
+        [s.HOST, "plugin", "install", "1xops@1xops"],
+    ]
+
+
+def bundle_version(path: str) -> str:
+    """The enterprise bundle's version, read without unpacking. ValueError if it is not a 1xops enterprise bundle."""
+    import tarfile
+
+    try:
+        with tarfile.open(path, "r:gz") as tar:
+            market = json.load(tar.extractfile(".claude-plugin/marketplace.json"))
+            plugin = json.load(tar.extractfile("plugins/1xops/.claude-plugin/plugin.json"))
+    except (OSError, KeyError, tarfile.TarError, ValueError, TypeError) as exc:
+        raise ValueError(f"{path} is not a 1xops enterprise bundle") from exc
+    if market.get("name") != "1xops" or plugin.get("name") != "1xops":
+        raise ValueError(f"{path} is not a 1xops enterprise bundle")
+    return str(plugin.get("version", "0"))
 
 
 def _run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
@@ -95,6 +125,31 @@ def check_tools() -> list[tuple[str, bool, bool, str]]:
         code, out = _run([name, "--version"])
         rows.append((name, required, code == 0, out.splitlines()[0] if out else path))
     return rows
+
+
+def check_edition() -> tuple[str, bool, bool, str]:
+    """Which 1xops plugin edition is installed, from the host's own plugin records. Read-only."""
+    folder = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / f".{s.HOST}") / "plugins"
+
+    def read(name: str) -> dict:
+        try:
+            return json.loads((folder / name).read_text())
+        except (OSError, ValueError):
+            return {}
+
+    installed = read("installed_plugins.json").get("plugins", {})
+
+    def version(key: str) -> str:
+        return (installed.get(key) or [{}])[0].get("version", "")
+
+    if "1xops@1xops" in installed:
+        source = read("known_marketplaces.json").get("1xops", {}).get("source", {})
+        if source.get("repo") == "nnthanh101/1xops":
+            return ("edition", False, False, "free, old marketplace name: run 1xops install --yes")
+        return ("edition", False, True, f"enterprise {version('1xops@1xops')}".strip())
+    if "1xops@1ops" in installed:
+        return ("edition", False, True, f"free {version('1xops@1ops')}".strip())
+    return ("edition", False, False, "plugin not installed: 1xops install --yes")
 
 
 def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
@@ -285,7 +340,7 @@ RESULT_STYLE = {
 def cmd_doctor(args: argparse.Namespace) -> int:
     # The identity calls take seconds; a spinner on a terminal, nothing when piped.
     with console.status("Checking tools, sign-ins and connectors (read-only)…"):
-        rows = check_tools() + check_sign_in(args.aws_profile)
+        rows = check_tools() + [check_edition()] + check_sign_in(args.aws_profile)
         connectors = check_connectors(args.file)
     shown = [
         (
@@ -335,14 +390,39 @@ def cmd_install(args: argparse.Namespace) -> int:
     if not shutil.which(s.HOST):
         console.print(f"[red]'{s.HOST}' CLI not found; run '1xops doctor'.[/]")
         return 1
-    for step in INSTALL_STEPS:
+    steps, folder, bundle = INSTALL_STEPS, None, None
+    if args.edition == "enterprise":
+        if not args.file:
+            print(
+                f"The enterprise edition is sold at {SHOP}. Download the bundle from your order, then run:"
+            )
+            print(
+                "  1xops install --edition enterprise --file <1xops-enterprise-x.y.z.tar.gz> --yes"
+            )
+            return 2
+        try:
+            version = bundle_version(args.file)
+        except ValueError as exc:
+            console.print(Text(str(exc), style="red"), soft_wrap=True)
+            return 2
+        bundle, folder = args.file, str(Path.home() / ".1xops" / "enterprise" / version)
+        steps = enterprise_steps(folder)
+        console.print(Text(f"$ unpack {bundle} into {folder}", style="bold"), soft_wrap=True)
+        if args.yes:
+            import tarfile
+
+            Path(folder).mkdir(parents=True, exist_ok=True)
+            with tarfile.open(bundle, "r:gz") as tar:
+                tar.extractall(folder, filter="data")
+    for step in steps:
         step = [*step, "--scope", args.scope]
-        console.print(f"[bold]$ {' '.join(step)}[/]")
+        console.print(Text(f"$ {' '.join(step)}", style="bold"), soft_wrap=True)
         if not args.yes:
             continue
         code, out = _run(step, timeout=180)
-        console.print(out)
-        if code != 0:
+        console.print(out, markup=False, highlight=False, soft_wrap=True)
+        # removing the edition being replaced may fail harmlessly: it was not installed
+        if code != 0 and "uninstall" not in step and "remove" not in step:
             return code
     if not args.yes:
         console.print("Dry run. Re-run with --yes to install.")
@@ -522,6 +602,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="user",
         help="host install scope: user (default), project (shared), local",
     )
+    p.add_argument(
+        "--edition",
+        choices=("free", "enterprise"),
+        default="free",
+        help="free (default) or enterprise",
+    )
+    p.add_argument("--file", help="enterprise: the bundle downloaded from your order")
     p.add_argument("--yes", action="store_true", help="run the commands (default: show them)")
     p.set_defaults(func=cmd_install)
 
