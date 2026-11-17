@@ -10,8 +10,11 @@ set -euo pipefail
 R=nnthanh101/1xops
 cd "$(git rev-parse --show-toplevel)"
 git fetch -q origin --tags
-last=$(npm view 1xops version 2>/dev/null || echo 0.0.0)  # the latest published version
-# Next version = latest published + 1, by SemVer: BUMP=patch (default: fixes, UX), minor (a new command or
+# Latest = the highest of the latest published version and the latest tag (a tag can exist before its publish).
+pub=$(npm view 1xops version 2>/dev/null || echo 0.0.0)
+tag=$(git tag --list 'v*' --sort=-v:refname | head -1); tag=${tag#v}
+last=$(printf '%s\n%s\n' "$pub" "${tag:-0.0.0}" | sort -V | tail -1)
+# Next version = latest + 1, by SemVer: BUMP=patch (default: fixes, UX), minor (a new command or
 # capability), major (a breaking change to commands, files or settings).
 V=${VERSION:-$(echo "$last" | awk -F. -v b="${BUMP:-patch}" '{ if (b=="major") print $1+1".0.0"; else if (b=="minor") print $1"."$2+1".0"; else print $1"."$2"."$3+1 }')}
 STORY=${STORY:-}
