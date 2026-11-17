@@ -38,5 +38,5 @@ Connector servers named in the built-in profiles (fetched by the user at run tim
   @azure/mcp 3.0.0                                    https://github.com/microsoft/mcp MIT
   Atlassian remote server  https://mcp.atlassian.com/v2/mcp   hosted service, Atlassian's terms
 
-Container base image: python:3.15-slim (Docker Official Image); each package in it keeps
+Container base image: python:3.14-slim (Docker Official Image); each package in it keeps
 its own licence.

@@ -2,5 +2,5 @@
 #   act pull_request -W .github/workflows/validate.yml
 #   act workflow_dispatch -W .github/workflows/release.yml --secret-file .secrets
 --container-architecture linux/amd64
--P ubuntu-latest=nnthanh101/runbooks@sha256:ae95dc7cdee7edd384d9d9d986b1ec99c172106d75985d5328ae529381825255
+-P ubuntu-26.04=nnthanh101/runbooks@sha256:ae95dc7cdee7edd384d9d9d986b1ec99c172106d75985d5328ae529381825255
 --eventpath .github/act/event.json
