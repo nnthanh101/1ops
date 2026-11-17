@@ -4,7 +4,7 @@
 
 1xops is a free, open-source toolkit from [OceanSoft.io](https://www.oceansoft.io) for engineering teams on AWS, Azure and AI services. It connects your team's assistant to your cloud accounts and your Jira and Confluence, read-only, in a few minutes, for one person, a team or a whole organisation.
 
-> **Status:** the first release (v0.2) is in review. The commands below work once it is published.
+> **Status:** v0.2 is published on [PyPI](https://pypi.org/project/1xops/), [npm](https://www.npmjs.com/package/1xops), [Docker Hub](https://hub.docker.com/r/nnthanh101/1xops) and [ghcr.io](https://github.com/users/nnthanh101/packages/container/package/1xops).
 
 ## What you can do today
 

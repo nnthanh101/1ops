@@ -4,7 +4,8 @@
 const { spawnSync } = require("node:child_process");
 const { version } = require("../package.json");
 
-const args = ["tool", "run", "--from", `1xops==${version}`, "1xops", ...process.argv.slice(2)];
+// Python 3.14: the newest version AWS Lambda runs in production.
+const args = ["tool", "run", "--python", "3.14", "--from", `1xops==${version}`, "1xops", ...process.argv.slice(2)];
 const run = spawnSync("uv", args, { stdio: "inherit" });
 
 if (run.error && run.error.code === "ENOENT") {

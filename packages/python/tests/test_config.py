@@ -144,3 +144,15 @@ def test_env_prints_quoted_exports(tmp_path: Path, capsys):
     assert (
         "export AWS_REGION=ap-southeast-2" in out and "export AWS_OPERATIONS_PROFILE='a b'" in out
     )
+
+
+def test_local_scope_without_host_cli_writes_nothing(tmp_path: Path, monkeypatch):
+    # Found by the clean-container check of 0.2.0: settings were written, then the host CLI call failed.
+    monkeypatch.setattr(cli.shutil, "which", lambda _name: None)
+    project = tmp_path / "proj"
+    project.mkdir()
+    rc = cli.main(
+        ["config", "--scope", "local", "--dir", str(project), "--connectors", "aws", "--yes"]
+    )
+    assert rc == 1
+    assert not (project / ".claude").exists()

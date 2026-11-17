@@ -1,6 +1,6 @@
 {
   "name": "1xops",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "1xops by OceanSoft.io: runs the 1xops command line (doctor, install, config) through uv.",
   "license": "Apache-2.0",
   "author": "Nhat-Thanh Nguyen <nnthanh101@gmail.com> (https://www.oceansoft.io)",
