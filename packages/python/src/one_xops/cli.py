@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import re
 import shlex
 import shutil
 import subprocess
@@ -41,6 +42,29 @@ def _run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
 
 def _mask(account: str) -> str:
     return f"****{account[-4:]}" if len(account) >= 4 else "****"
+
+
+def scrub(text: str) -> str:
+    """Any 12-digit run (an AWS account ID), masked: doctor output is pasted onto issues as evidence."""
+    return re.sub(r"\d{12}", lambda m: _mask(m.group(0)), str(text))
+
+
+def access_from_role(arn: str = "") -> str:
+    """read: the role cannot change anything; write: it can; unknown: cannot tell from the name."""
+    m = re.search(r":assumed-role/([^/]+)/", arn) or re.search(r":(user|root)\b", arn)
+    role = m.group(1) if m else ""
+    if re.search(r"readonly|viewonly|securityaudit|readaccess|viewer", role, re.IGNORECASE):
+        return "read"
+    if re.search(r"admin|poweruser|fullaccess|root", role, re.IGNORECASE):
+        return "write"
+    return "unknown"
+
+
+ACCESS = {
+    "read": "read-only",
+    "write": "can change things: use a read-only role",
+    "unknown": "access unknown: use a read-only role",
+}
 
 
 # ── doctor ──────────────────────────────────────────────────────────────────
@@ -77,8 +101,17 @@ def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
             cmd += ["--profile", aws_profile]
         code, out = _run(cmd)
         if code == 0:
-            account = json.loads(out).get("Account", "")
-            rows.append(("aws sign-in", False, True, f"signed in, account {_mask(account)}"))
+            ident = json.loads(out)
+            access = access_from_role(ident.get("Arn", ""))
+            rows.append(
+                (
+                    "aws sign-in",
+                    False,
+                    True,
+                    f"signed in, account {_mask(ident.get('Account', ''))}",
+                )
+            )
+            rows.append(("aws access", False, access == "read", ACCESS[access]))
         else:
             rows.append(("aws sign-in", False, False, "not signed in (aws sso login)"))
     if shutil.which("az"):
@@ -110,10 +143,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     for col in ("check", "needed", "result", "detail"):
         table.add_column(col)
     for name, required, ok, detail in rows:
-        result = (
-            "[green]ok[/]" if ok else ("[red]missing[/]" if required else "[yellow]optional[/]")
-        )
-        table.add_row(name, "required" if required else "optional", result, detail)
+        result = "[green]ok[/]" if ok else ("[red]missing[/]" if required else "[yellow]check[/]")
+        table.add_row(name, "required" if required else "optional", result, scrub(detail))
     console.print(table)
     failed = [r[0] for r in rows if r[1] and not r[2]]
     if failed:
@@ -162,10 +193,7 @@ def _show_change(path: Path, before: dict, after: dict) -> bool:
 
 
 def _write(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(s.dumps(data))
-    tmp.replace(path)
+    s.write(path, s.dumps(data))
 
 
 def _resolve(args: argparse.Namespace) -> tuple[str, Path, Path | None, dict[str, dict]]:

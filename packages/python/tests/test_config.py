@@ -179,3 +179,29 @@ def test_local_scope_without_host_cli_writes_nothing(tmp_path: Path, monkeypatch
     )
     assert rc == 1
     assert not (project / ".claude").exists()
+
+
+def test_scrub_masks_every_12_digit_account_id():
+    assert (
+        cli.scrub("arn:aws:sts::123456789012:assumed-role/Admin-123456789012/x")
+        == "arn:aws:sts::****9012:assumed-role/Admin-****9012/x"
+    )
+    assert cli.scrub("aws-cli/2.31.0") == "aws-cli/2.31.0"
+
+
+@pytest.mark.parametrize(
+    ("arn", "access"),
+    [
+        ("arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_ReadOnlyAccess_abc/me", "read"),
+        ("arn:aws:sts::123456789012:assumed-role/SecurityAudit/me", "read"),
+        (
+            "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AdministratorAccess_abc/me",
+            "write",
+        ),
+        ("arn:aws:iam::123456789012:root", "write"),
+        ("arn:aws:sts::123456789012:assumed-role/ops/me", "unknown"),
+        ("", "unknown"),
+    ],
+)
+def test_access_from_role(arn, access):
+    assert cli.access_from_role(arn) == access

@@ -66,8 +66,7 @@ gh api -X POST repos/nnthanh101/1xops/rulesets --input .github/rulesets/main.jso
 
 ## Release a version
 
-1. Bump the same version in `packages/python/pyproject.toml` and `packages/npm/package.json` on a `feature/*` branch; land on `develop`.
-2. Open the pull request `develop` → `main`; CI runs; merge.
-3. Tag on `main`: `git tag v0.2.0 && git push origin v0.2.0`.
-4. Approve the `release` environment once: PyPI, npm and the images publish in parallel.
-5. Check: `uvx 1xops@0.2.0 --version`, `npx 1xops@0.2.0 --version`, `docker run --rm ghcr.io/nnthanh101/1xops:0.2.0 --version`.
+1. Set the version on `develop` and push it. If you skip this, `task release` stops and prints the one line to run.
+2. `task release VERSION=x.y.z STORY=n`, then approve the `release` environment once, at the link it prints. It merges `develop` into `main` once the checks pass, tags it, waits for PyPI, npm and the images, installs the release from every channel in clean containers and posts that proof on story `n`.
+
+`task status` shows what customers can install today and each story's proof.

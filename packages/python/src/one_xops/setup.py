@@ -87,7 +87,7 @@ def run(args: argparse.Namespace) -> int:
         return 1
     if not Confirm.ask(f"Write {path}?", default=True):
         return 1
-    path.write_text(text)
+    s.write(path, text)
     cf.load(path)  # same checks as `1xops config --file`
 
     console.print("\nChanges this would make:")
