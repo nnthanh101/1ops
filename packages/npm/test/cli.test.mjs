@@ -17,10 +17,10 @@ const cli = (args, env = {}) => spawnSync(process.execPath, [BIN, ...args], { en
 const json = (f) => JSON.parse(readFileSync(f, 'utf8'));
 
 test('merge keeps user values, adds missing, and is idempotent', () => {
-  const existing = { model: 'x', permissions: { deny: ['Read(./secrets)'] }, enabledPlugins: { '1xops@1xops': false } };
+  const existing = { model: 'x', permissions: { deny: ['Read(./secrets)'] }, enabledPlugins: { '1xops@1ops': false } };
   const merged = s.merge(existing, s.BASELINE);
   assert.equal(merged.model, 'x');
-  assert.equal(merged.enabledPlugins['1xops@1xops'], false);
+  assert.equal(merged.enabledPlugins['1xops@1ops'], false);
   assert.equal(merged.permissions.deny[0], 'Read(./secrets)');
   assert.ok(merged.permissions.deny.includes('Read(./.env)'));
   assert.deepEqual(s.merge(merged, s.BASELINE), merged);
@@ -59,7 +59,7 @@ test('team write keeps existing servers; second run is a no-op', () => {
   const args = ['config', '--scope', 'team', '--dir', d, '--connectors', 'aws', 'itsm', '--yes'];
   assert.equal(cli(args).status, 0);
   const settings = json(path.join(d, '.claude', 'settings.json'));
-  assert.equal(settings.enabledPlugins['1xops@1xops'], true);
+  assert.equal(settings.enabledPlugins['1xops@1ops'], true);
   assert.ok(settings.permissions.ask.includes('mcp__atlassian__*'));
   const mcp = json(path.join(d, '.mcp.json')).mcpServers;
   assert.ok('mine' in mcp && 'awslabs-cloudtrail' in mcp && 'atlassian' in mcp);

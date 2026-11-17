@@ -13,7 +13,7 @@ HOST = "claude"  # host CLI binary and config folder name (technical identifier)
 SCOPES = ("org", "team", "local", "personal")
 
 MARKETPLACES = {
-    "1xops": {"source": {"source": "github", "repo": "nnthanh101/1xops"}},
+    "1ops": {"source": {"source": "github", "repo": "nnthanh101/1xops"}},  # free edition
     "knowledge-work-plugins": {
         "source": {"source": "github", "repo": "anthropics/knowledge-work-plugins"}
     },
@@ -24,7 +24,7 @@ MARKETPLACES = {
 # (sessions sign in read-only; these rules ask, the read-only identity is the boundary).
 BASELINE = {
     "extraKnownMarketplaces": MARKETPLACES,
-    "enabledPlugins": {"1xops@1xops": True, "operations@knowledge-work-plugins": True},
+    "enabledPlugins": {"1xops@1ops": True, "operations@knowledge-work-plugins": True},
     "permissions": {
         "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"],
         "ask": [

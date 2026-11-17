@@ -9,7 +9,7 @@ export const HOST = 'claude'; // host CLI binary and config folder name (technic
 export const SCOPES = ['org', 'team', 'local', 'personal'];
 
 const MARKETPLACES = {
-  '1xops': { source: { source: 'github', repo: 'nnthanh101/1xops' } },
+  '1ops': { source: { source: 'github', repo: 'nnthanh101/1xops' } },
   'knowledge-work-plugins': { source: { source: 'github', repo: 'anthropics/knowledge-work-plugins' } },
 };
 
@@ -17,7 +17,7 @@ const MARKETPLACES = {
 // and a person's yes before anything leaves the machine or rewrites history.
 export const BASELINE = {
   extraKnownMarketplaces: MARKETPLACES,
-  enabledPlugins: { '1xops@1xops': true, 'operations@knowledge-work-plugins': true },
+  enabledPlugins: { '1xops@1ops': true, 'operations@knowledge-work-plugins': true },
   permissions: {
     deny: ['Read(./.env)', 'Read(./.env.*)', 'Read(./**/.env)', 'Read(./**/.env.*)'],
     ask: [
