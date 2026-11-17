@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# pre-commit: scans the staged change for secrets with gitleaks in its pinned image, as advice. It names what it found
+# and lets the commit go ahead: the person decides (docs/adr/0026). The same file is used in every repository of the git
+# standard; `sh scripts/git-standard.sh audit` compares the copies. Turned on per clone by
+# `git config core.hooksPath .githooks`. `bash .githooks/pre-commit --self-test` proves it.
+set -uo pipefail
+GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"
+
+scan() { # reads the staged diff on stdin; prints advice; always returns 0
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    echo "pre-commit: advice - Docker is not running, so the staged change was not scanned for secrets"; return 0
+  fi
+  local out rc
+  out=$(docker run --rm -i "$GITLEAKS_IMAGE" stdin --redact --no-banner --exit-code 1 -v 2>&1); rc=$?
+  case "$rc" in
+    0) ;;
+    1) printf '%s\n' "$out" | grep -E "leaks found|RuleID|Line:" | head -12
+       echo "pre-commit: advice - gitleaks found a possible secret in the staged change; the commit goes ahead. Unstage it, or rotate it if it is real." ;;
+    *) echo "pre-commit: advice - gitleaks stopped with exit $rc, so the staged change was not scanned" ;;
+  esac
+  return 0
+}
+
+if [ "${1:-}" = --self-test ]; then
+  # Offline, on stubs: no Docker means a named skip; a finding is named and the hook still exits 0; a clean scan is
+  # silent. With Docker running, the real image also finds a planted key.
+  t=$(mktemp -d); trap 'rm -rf "$t"' EXIT; ok=0; n=3
+  mkdir "$t/none" "$t/find" "$t/clean"
+  printf '#!/bin/sh\nexit 1\n' > "$t/none/docker"
+  printf '#!/bin/sh\n[ "$1" = info ] && exit 0\ncat >/dev/null; echo "Finding: REDACTED"; echo "RuleID: aws-access-token"; exit 1\n' > "$t/find/docker"
+  printf '#!/bin/sh\n[ "$1" = info ] && exit 0\ncat >/dev/null; exit 0\n' > "$t/clean/docker"
+  chmod +x "$t"/*/docker
+  o=$(echo x | PATH="$t/none:$PATH" scan); rc=$?
+  [ "$rc" = 0 ] && printf '%s' "$o" | grep -q 'not scanned' && ok=$((ok + 1)) || echo "  [FAIL] Docker down: expected a named skip and exit 0"
+  o=$(echo x | PATH="$t/find:$PATH" scan); rc=$?
+  [ "$rc" = 0 ] && printf '%s' "$o" | grep -q 'possible secret' && ok=$((ok + 1)) || echo "  [FAIL] a finding was not named, or the hook held the commit back"
+  o=$(echo x | PATH="$t/clean:$PATH" scan); rc=$?
+  [ "$rc" = 0 ] && [ -z "$o" ] && ok=$((ok + 1)) || echo "  [FAIL] a clean scan was not silent"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    n=4; key="ghp_$(printf 'a1B2c3D4e5%.0s' 1 2 3 4)"
+    o=$(printf '+github_pat = %s\n' "$key" | scan)
+    printf '%s' "$o" | grep -q 'possible secret' && ok=$((ok + 1)) || echo "  [FAIL] the pinned gitleaks image did not find a planted key"
+  else echo "  [skip] the real image: Docker is not running"; fi
+  echo "pre-commit self-test: $ok/$n cases as expected"; [ "$ok" = "$n" ]; exit $?
+fi
+
+git diff --cached --no-color --no-ext-diff | scan
+exit 0

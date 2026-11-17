@@ -1,0 +1,49 @@
+{
+  "description": "AWS Labs servers: cost, audit, monitoring, security review (use read-only roles)",
+  "mcpServers": {
+    "awslabs-billing-cost-management": {
+      "args": [
+        "awslabs.billing-cost-management-mcp-server==0.0.45"
+      ],
+      "command": "uvx",
+      "env": {
+        "AWS_PROFILE": "${AWS_BILLING_PROFILE}",
+        "AWS_REGION": "us-east-1",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "awslabs-cloudtrail": {
+      "args": [
+        "awslabs.cloudtrail-mcp-server==0.1.1"
+      ],
+      "command": "uvx",
+      "env": {
+        "AWS_PROFILE": "${AWS_OPERATIONS_PROFILE}",
+        "AWS_REGION": "${AWS_REGION}",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "awslabs-cloudwatch": {
+      "args": [
+        "awslabs.cloudwatch-mcp-server==0.3.1"
+      ],
+      "command": "uvx",
+      "env": {
+        "AWS_PROFILE": "${AWS_OPERATIONS_PROFILE}",
+        "AWS_REGION": "${AWS_REGION}",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "awslabs-well-architected-security": {
+      "args": [
+        "awslabs.well-architected-security-mcp-server==0.2.1"
+      ],
+      "command": "uvx",
+      "env": {
+        "AWS_PROFILE": "${AWS_OPERATIONS_PROFILE}",
+        "AWS_REGION": "${AWS_REGION}",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    }
+  }
+}

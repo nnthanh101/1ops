@@ -1,0 +1,44 @@
+name: Upstream bump
+
+# Monthly: move the knowledge-work-plugins pin to upstream main and open a PR to develop.
+# Locally: act workflow_dispatch -W .github/workflows/upstream-bump.yml --secret-file .secrets
+on:
+  schedule:
+    - cron: "0 22 1 * *" # 1st of the month, 22:00 UTC (morning in NZ and eastern Australia)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: upstream-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # pushes the feature/upstream-bump-* branch
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          submodules: true
+      - name: Update the pin and open a PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          old=$(git -C upstream/knowledge-work-plugins rev-parse --short HEAD)
+          git submodule update --remote upstream/knowledge-work-plugins
+          new=$(git -C upstream/knowledge-work-plugins rev-parse --short HEAD)
+          if [ "$old" = "$new" ]; then echo "Already at upstream $new"; exit 0; fi
+          test -f plugins/operations/.claude-plugin/plugin.json || { echo "upstream moved operations/"; exit 1; }
+          branch="feature/upstream-bump-$(date -u +%Y-%m)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "chore: knowledge-work-plugins $old → $new"
+          git push -u origin "$branch"
+          gh pr create --base develop --title "chore: knowledge-work-plugins $old → $new" \
+            --body "Monthly upstream pin bump. Upstream changes: https://github.com/anthropics/knowledge-work-plugins/compare/$old...$new"

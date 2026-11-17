@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "github": { "type": "http", "url": "https://api.githubcopilot.com/mcp/" },
+    "azure-devops": { "type": "http", "url": "https://mcp.dev.azure.com/${AZURE_DEVOPS_ORG}" },
+    "atlassian": { "type": "http", "url": "https://mcp.atlassian.com/v2/mcp" },
+    "notion": { "type": "http", "url": "https://mcp.notion.com/mcp" },
+    "slack": { "type": "http", "url": "https://mcp.slack.com/mcp" }
+  }
+}

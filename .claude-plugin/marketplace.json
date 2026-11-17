@@ -1,0 +1,20 @@
+{
+  "name": "1xops",
+  "owner": {
+    "name": "Nhat-Thanh Nguyen",
+    "email": "nnthanh101@gmail.com"
+  },
+  "metadata": {
+    "description": "1xops by OceanSoft.io — Cloud & AI Operations. Free, open source (Apache-2.0)."
+  },
+  "plugins": [
+    {
+      "name": "1xops",
+      "source": "./plugins/1xops",
+      "description": "Cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced; nothing changed without a yes."
+    }
+  ],
+  "allowCrossMarketplaceDependenciesOn": [
+    "knowledge-work-plugins"
+  ]
+}

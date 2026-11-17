@@ -1,0 +1,22 @@
+{
+  "description": "Microsoft Azure MCP server, read-only mode",
+  "mcpServers": {
+    "azure": {
+      "args": [
+        "-y",
+        "@azure/mcp@3.0.0",
+        "server",
+        "start",
+        "--mode",
+        "namespace",
+        "--read-only"
+      ],
+      "command": "npx",
+      "env": {
+        "AZURE_MCP_COLLECT_TELEMETRY": "false",
+        "AZURE_SUBSCRIPTION_ID": "${AZURE_SUBSCRIPTION_ID}",
+        "AZURE_TENANT_ID": "${AZURE_TENANT_ID}"
+      }
+    }
+  }
+}
