@@ -133,4 +133,4 @@ jobs:
             ghcr.io/nnthanh101/1xops:latest
             nnthanh101/1xops:${{ needs.check.outputs.version }}
             nnthanh101/1xops:latest
-          labels: org.opencontainers.image.source=https://github.com/nnthanh101/1xops
+          build-args: VERSION=${{ needs.check.outputs.version }}

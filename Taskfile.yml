@@ -6,7 +6,7 @@
 #     task config [YES=1]                  apply my settings (a preview unless YES=1)
 #   Owner and leadership
 #     task status                          what customers can install today, each story's proof, product health
-#     task release VERSION=x.y.z STORY=n   ship a version and prove it: one command, one approval click
+#     task release [VERSION=x.y.z] STORY=n ship the next version and prove it: tested here first, one approval click
 #   Engineer
 #     task test                            quick tests
 #     task ci                              the full check, as it runs on GitHub
@@ -41,9 +41,9 @@ tasks:
     cmds: [bash scripts/status.sh]
 
   release:
-    desc: 'Owner only: ship VERSION and post the proof on STORY (one approval click)'
-    requires: {vars: [VERSION]}
-    cmds: ['bash scripts/release.sh {{.VERSION}} {{.STORY}}']
+    desc: 'Owner only: ship the next version (or VERSION), tested here first; proof posted on STORY'
+    interactive: true
+    cmds: ['VERSION={{.VERSION}} STORY={{.STORY}} bash scripts/release.sh']
 
   test:
     desc: Quick tests
