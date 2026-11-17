@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-commit: scans the staged change for secrets with gitleaks in its pinned image, as advice. It names what it found
+# pre-commit: scans the staged change for secrets with gitleaks in its pinned image, as advice, for the assistant only; a person's commit runs nothing. It names what it found
 # and lets the commit go ahead: the person decides (docs/adr/0026). The same file is used in every repository of the git
 # standard; `sh scripts/git-standard.sh audit` compares the copies. Turned on per clone by
 # `git config core.hooksPath .githooks`. `bash .githooks/pre-commit --self-test` proves it.
@@ -43,6 +43,9 @@ if [ "${1:-}" = --self-test ]; then
   else echo "  [skip] the real image: Docker is not running"; fi
   echo "pre-commit self-test: $ok/$n cases as expected"; [ "$ok" = "$n" ]; exit $?
 fi
+
+# Agent only. The owner (human in the loop) owns develop and every branch: a person's commit or push runs nothing.
+[ -n "${CLAUDECODE:-}${CODEX_SANDBOX:-}" ] || exit 0
 
 git diff --cached --no-color --no-ext-diff | scan
 exit 0

@@ -1,4 +1,4 @@
-# 1xops 🧰 Cloud & AI Operations ⚙️
+# 🥇 ONE 🧰 Cloud & AI Operations ⚙️
 
 **Reduce cloud and AI costs. Automate operational work. Keep your team in control.**
 
@@ -18,12 +18,11 @@
 
 | Outcome | For | Milestone |
 |---|---|---|
-| The top 3 AWS savings, each with \$/month and where the figure came from | CTOs, cloud leads | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
-| The same for Azure subscriptions | Engineering leads | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
-| A change request ready for your change board, from a real Terraform plan | Change managers | [v0.4](https://github.com/nnthanh101/1xops/milestone/3) |
-| Last month's AI spend by team and vendor | FinOps leads | [v0.4](https://github.com/nnthanh101/1xops/milestone/3) |
-| Runbooks that wait for a person's yes at each step and keep a record | On-call engineers | [v0.5](https://github.com/nnthanh101/1xops/milestone/4) |
-| The weekly status report, straight from the project board | Delivery leads | [v0.5](https://github.com/nnthanh101/1xops/milestone/4) |
+| Every session starts by naming the broken connectors, with the fix | SREs, on-call engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| The assistant asks before any AWS or Azure write, or a call on an expired sign-in or the wrong account | Cloud engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| Runbooks, change requests, status reports and risk assessments from your own tools, read-only, in 15 minutes | Platform engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+
+Cost checks, change requests from a Terraform plan, AI spend, evidenced runbooks and status from the project board are in the enterprise edition at [shop.oceansoft.io](https://shop.oceansoft.io).
 
 ## Get started
 

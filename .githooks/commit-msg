@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# commit-msg: checks the message and identity against the git standard, as advice. It names what differs and lets the
+# commit-msg: checks the message and identity against the git standard, as advice, for the assistant only; a person's commit runs nothing. It names what differs and lets the
 # commit go ahead: the person decides (docs/adr/0026). The same file is used in every repository of the git standard.
 #   - a Conventional Commits header of at most 100 characters (release-please reads it)
 #   - author and committer are the owner (git config git-standard.owner, else nnthanh101@gmail.com)
@@ -42,6 +42,9 @@ if [ "${1:-}" = --self-test ]; then
   case_ "another committer" "committer is $x" "fix: a" "$o" "$x"
   echo "commit-msg self-test: $ok/8 cases as expected"; [ "$ok" = 8 ]; exit $?
 fi
+
+# Agent only. The owner (human in the loop) owns develop and every branch: a person's commit or push runs nothing.
+[ -n "${CLAUDECODE:-}${CODEX_SANDBOX:-}" ] || exit 0
 
 ae=$(git var GIT_AUTHOR_IDENT 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p')
 ce=$(git var GIT_COMMITTER_IDENT 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p')

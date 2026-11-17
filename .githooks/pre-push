@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pre-push: every branch except develop and main is proven locally before it reaches GitHub, because GitHub Actions
 # runs only for develop and main. It runs the tests of the Release workflow with act, and builds the image act cannot build.
-# Advice only: it names what failed and how to rerun it, then lets the push go ahead. The person decides.
+# Assistant only (a person's push runs nothing). Advice only: it names what failed and how to rerun it, then lets the push go ahead. The person decides.
 # Turned on per clone by `git config core.hooksPath .githooks`. `bash .githooks/pre-push --self-test` proves it.
 set -uo pipefail
 unset GIT_DIR GIT_WORK_TREE
@@ -18,6 +18,9 @@ if [ "${1:-}" = --self-test ]; then
   [ "$ok" = 3 ] || echo "  [FAIL] develop and main are checked by GitHub, not by this hook"
   echo "pre-push self-test: $ok/3 cases as expected"; [ "$ok" = 3 ]; exit $?
 fi
+
+# Agent only. The owner (human in the loop) owns develop and every branch: a person's commit or push runs nothing.
+[ -n "${CLAUDECODE:-}${CODEX_SANDBOX:-}" ] || exit 0
 
 root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
