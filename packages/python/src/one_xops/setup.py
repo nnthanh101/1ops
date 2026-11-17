@@ -1,4 +1,4 @@
-"""`1xops setup`: a guided terminal setup that writes 1ops.yaml, then shows and applies the changes."""
+"""`1xops setup`: a guided terminal setup that writes 1xops.yaml, then shows and applies the changes."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from pathlib import Path
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 
-from one_ops import config_file as cf
-from one_ops import settings as s
+from one_xops import config_file as cf
+from one_xops import settings as s
 
 console = Console()
 
@@ -52,7 +52,7 @@ def ask_value(var: str, found: dict) -> str:
 
 
 def run(args: argparse.Namespace) -> int:
-    from one_ops import cli  # imported here: cli imports this module
+    from one_xops import cli  # imported here: cli imports this module
 
     path = Path(args.file)
     console.print("[bold]1xops setup[/] — non-secret values only; secrets stay in your sign-in.\n")

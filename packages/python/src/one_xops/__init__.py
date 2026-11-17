@@ -1,4 +1,4 @@
-"""1ops by OceanSoft.io."""
+"""1xops by OceanSoft.io."""
 
 from importlib.metadata import PackageNotFoundError, version
 

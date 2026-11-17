@@ -1,4 +1,4 @@
-"""1ops.yaml: the end-user configuration file. Non-secret values only.
+"""1xops.yaml: the end-user configuration file. Non-secret values only.
 
     scope: team                      # org | team | local | personal
     dir: .                           # project or tenant folder (team, local)
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from one_ops import settings as s
+from one_xops import settings as s
 
 VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-[^}]*)?\}")
 SECRET_HINTS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY")
@@ -44,7 +44,7 @@ def substitute(value, values: dict[str, str]):
 
 
 def load(path: Path) -> dict:
-    """Read and check 1ops.yaml. Returns {scope, dir, out, connectors: {name: {VAR: value}}}."""
+    """Read and check 1xops.yaml. Returns {scope, dir, out, connectors: {name: {VAR: value}}}."""
     data = yaml.safe_load(path.read_text()) or {}
     if not isinstance(data, dict):
         raise TypeError(f"{path}: expected a mapping at the top level")
@@ -65,7 +65,7 @@ def load(path: Path) -> dict:
             if any(h in key for h in SECRET_HINTS):
                 raise ValueError(
                     f"{path}: {name}.{key} looks like a secret; keep it in your keychain or "
-                    "sign-in, not in 1ops.yaml"
+                    "sign-in, not in 1xops.yaml"
                 )
     return {
         "scope": scope,
@@ -76,5 +76,5 @@ def load(path: Path) -> dict:
 
 
 def dump(config: dict) -> str:
-    header = "# 1ops.yaml — non-secret values only. Do not commit if it holds personal values.\n"
+    header = "# 1xops.yaml — non-secret values only. Do not commit if it holds personal values.\n"
     return header + yaml.safe_dump(config, sort_keys=False, default_flow_style=False)

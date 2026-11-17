@@ -18,17 +18,17 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from one_ops import __version__
-from one_ops import config_file as cf
-from one_ops import settings as s
-from one_ops import setup as wizard
+from one_xops import __version__
+from one_xops import config_file as cf
+from one_xops import settings as s
+from one_xops import setup as wizard
 
 console = Console()
 
 INSTALL_STEPS = [
     [s.HOST, "plugin", "marketplace", "add", "anthropics/knowledge-work-plugins"],
-    [s.HOST, "plugin", "marketplace", "add", "nnthanh101/1ops"],
-    [s.HOST, "plugin", "install", "1ops@1ops"],
+    [s.HOST, "plugin", "marketplace", "add", "nnthanh101/1xops"],
+    [s.HOST, "plugin", "install", "1xops@1xops"],
 ]
 
 
@@ -170,7 +170,7 @@ def _write(path: Path, data: dict) -> None:
 
 
 def _resolve(args: argparse.Namespace) -> tuple[str, Path, Path | None, dict[str, dict]]:
-    """Scope, folder, org output and {connector: values}, from 1ops.yaml or the flags."""
+    """Scope, folder, org output and {connector: values}, from 1xops.yaml or the flags."""
     if args.file:
         cfg = cf.load(Path(args.file))
         out = Path(cfg["out"]).resolve() if cfg["out"] else None
@@ -238,7 +238,7 @@ def cmd_config(args: argparse.Namespace) -> int:
 
 
 def cmd_env(args: argparse.Namespace) -> int:
-    """Print `export VAR=value` lines from 1ops.yaml, for team and org scopes."""
+    """Print `export VAR=value` lines from 1xops.yaml, for team and org scopes."""
     try:
         cfg = cf.load(Path(args.file))
     except (ValueError, TypeError, OSError, yaml.YAMLError) as exc:
@@ -252,7 +252,7 @@ def cmd_env(args: argparse.Namespace) -> int:
 
 def cmd_profiles(_: argparse.Namespace) -> int:
     table = Table(title="Connector profiles")
-    for col in ("profile", "servers", "values (1ops.yaml keys)", "description"):
+    for col in ("profile", "servers", "values (1xops.yaml keys)", "description"):
         table.add_column(col)
     for name in s.builtin_profiles():
         p = s.load_profile(name)
@@ -271,7 +271,7 @@ def cmd_profiles(_: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="1xops", description="1ops by OceanSoft.io")
+    parser = argparse.ArgumentParser(prog="1xops", description="1xops by OceanSoft.io")
     parser.add_argument("--version", action="version", version=f"1xops {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -306,16 +306,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PROFILE",
         help="built-in profile names (see '1xops profiles') or .json files",
     )
-    p.add_argument("--file", help="read scope, folder and connector values from 1ops.yaml")
+    p.add_argument("--file", help="read scope, folder and connector values from 1xops.yaml")
     p.add_argument("--yes", action="store_true", help="write the changes (default: show a diff)")
     p.set_defaults(func=cmd_config)
 
-    p = sub.add_parser("env", help="print export lines for the values in 1ops.yaml")
-    p.add_argument("--file", default="1ops.yaml")
+    p = sub.add_parser("env", help="print export lines for the values in 1xops.yaml")
+    p.add_argument("--file", default="1xops.yaml")
     p.set_defaults(func=cmd_env)
 
-    p = sub.add_parser("setup", help="guided setup: asks questions, writes 1ops.yaml")
-    p.add_argument("--file", default="1ops.yaml")
+    p = sub.add_parser("setup", help="guided setup: asks questions, writes 1xops.yaml")
+    p.add_argument("--file", default="1xops.yaml")
     p.set_defaults(func=wizard.run)
 
     p = sub.add_parser("profiles", help="list built-in connector profiles")

@@ -1,7 +1,7 @@
 [project]
 name = "1xops"
 version = "0.2.0"
-description = "1ops by OceanSoft.io: set up the 1ops plugin, settings and read-only cloud connectors for an organisation, team or person."
+description = "1xops by OceanSoft.io: set up the 1xops plugin, settings and read-only cloud connectors for an organisation, team or person."
 readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
@@ -17,11 +17,11 @@ dependencies = ["pyyaml>=6.0.3", "rich>=15.0.0"]
 
 [project.urls]
 Homepage = "https://www.oceansoft.io"
-Repository = "https://github.com/nnthanh101/1ops"
-Issues = "https://github.com/nnthanh101/1ops/issues"
+Repository = "https://github.com/nnthanh101/1xops"
+Issues = "https://github.com/nnthanh101/1xops/issues"
 
 [project.scripts]
-1xops = "one_ops.cli:main"
+1xops = "one_xops.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=9.2", "ruff>=0.17"]
@@ -31,10 +31,10 @@ requires = ["hatchling>=1.33"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/one_ops"]
+packages = ["src/one_xops"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/one_ops", "tests", "README.md"]
+include = ["src/one_xops", "tests", "README.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

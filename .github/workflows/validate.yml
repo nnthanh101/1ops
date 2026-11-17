@@ -31,7 +31,7 @@ jobs:
           node "$RUNNER_TEMP/v/node_modules/@anthropic-ai/claude-code/install.cjs"
           v="$RUNNER_TEMP/v/node_modules/.bin/claude"
           "$v" plugin validate --strict .
-          "$v" plugin validate --strict plugins/1ops
+          "$v" plugin validate --strict plugins/1xops
       - name: Upstream symlink resolves
         run: test -f plugins/operations/.claude-plugin/plugin.json
 

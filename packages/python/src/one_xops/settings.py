@@ -12,7 +12,7 @@ HOST = "claude"  # host CLI binary and config folder name (technical identifier)
 SCOPES = ("org", "team", "local", "personal")
 
 MARKETPLACES = {
-    "1ops": {"source": {"source": "github", "repo": "nnthanh101/1ops"}},
+    "1xops": {"source": {"source": "github", "repo": "nnthanh101/1xops"}},
     "knowledge-work-plugins": {
         "source": {"source": "github", "repo": "anthropics/knowledge-work-plugins"}
     },
@@ -22,7 +22,7 @@ MARKETPLACES = {
 # and a person's yes before anything leaves the machine or rewrites history.
 BASELINE = {
     "extraKnownMarketplaces": MARKETPLACES,
-    "enabledPlugins": {"1ops@1ops": True, "operations@knowledge-work-plugins": True},
+    "enabledPlugins": {"1xops@1xops": True, "operations@knowledge-work-plugins": True},
     "permissions": {
         "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"],
         "ask": [
@@ -86,7 +86,7 @@ def merge(existing: dict, incoming: dict) -> dict:
 
 
 def builtin_profiles() -> list[str]:
-    files = resources.files("one_ops.profiles").iterdir()
+    files = resources.files("one_xops.profiles").iterdir()
     return sorted(f.name[:-5] for f in files if f.name.endswith(".json"))
 
 
@@ -97,7 +97,7 @@ def load_profile(name_or_path: str) -> dict:
         data = json.loads(path.read_text())
     elif name_or_path in builtin_profiles():
         data = json.loads(
-            resources.files("one_ops.profiles").joinpath(f"{name_or_path}.json").read_text()
+            resources.files("one_xops.profiles").joinpath(f"{name_or_path}.json").read_text()
         )
     else:
         raise ValueError(

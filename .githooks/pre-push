@@ -19,7 +19,7 @@ checks() { # ROOT: runs each quick check; prints one line per check; always retu
     if out=$(cd "$root" && bash -c "$cmd" 2>&1); then echo "  [pass] $name"
     else echo "  [FAIL] $name"; printf '%s\n' "$out" | tail -4 | sed 's/^/    /'; fi
   done <<'LIST'
-plugin|claude plugin validate --strict . >/dev/null && claude plugin validate --strict plugins/1ops >/dev/null
+plugin|claude plugin validate --strict . >/dev/null && claude plugin validate --strict plugins/1xops >/dev/null
 python lint|cd packages/python && uv run --frozen ruff check src tests && uv run --frozen ruff format --check src tests
 python tests|cd packages/python && uv run --frozen pytest -q
 versions|test "$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)" = "$(node -p "require('./packages/npm/package.json').version")"

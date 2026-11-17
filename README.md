@@ -1,10 +1,10 @@
-# 1ops
+# 1xops
 
 **Reduce cloud and AI costs. Automate operational work. Keep your team in control.**
 
-1ops by [OceanSoft.io](https://www.oceansoft.io) is a free, open-source operations plugin for engineering teams on AWS, Azure and AI services. It finds cost savings, writes change requests and runs runbooks on your real systems, and it shows where every number came from.
+1xops by [OceanSoft.io](https://www.oceansoft.io) is a free, open-source operations plugin for engineering teams on AWS, Azure and AI services. It finds cost savings, writes change requests and runs runbooks on your real systems, and it shows where every number came from.
 
-[![Validate](https://github.com/nnthanh101/1ops/actions/workflows/validate.yml/badge.svg)](https://github.com/nnthanh101/1ops/actions/workflows/validate.yml) · Licence: [Apache-2.0](LICENSE)
+[![Validate](https://github.com/nnthanh101/1xops/actions/workflows/validate.yml/badge.svg)](https://github.com/nnthanh101/1xops/actions/workflows/validate.yml) · Licence: [Apache-2.0](LICENSE)
 
 ## Principles
 
@@ -15,18 +15,18 @@
 ## Install
 
 ```
-/plugin marketplace add nnthanh101/1ops
-/plugin install 1ops@1ops
-/1ops:check        # ships with #5 (Sprint 1)
+/plugin marketplace add nnthanh101/1xops
+/plugin install 1xops@1xops
+/1xops:check        # ships with #5 (Sprint 1)
 ```
 
-`/1ops:check` lists each configured connector as ready, signed out or missing, and how to fix it. The plugin declares its one dependency (the free base `operations` plugin) in the [plugin manifest](plugins/1ops/).
+`/1xops:check` lists each configured connector as ready, signed out or missing, and how to fix it. The plugin declares its one dependency (the free base `operations` plugin) in the [plugin manifest](plugins/1xops/).
 
-### Other ways to get 1ops
+### Other ways to get 1xops
 
 | Channel | Command | What you get |
 |---|---|---|
-| git | `git clone --recurse-submodules https://github.com/nnthanh101/1ops` | The plugin, plus the upstream base plugins pinned in `upstream/` (`plugins/operations` links to it) |
+| git | `git clone --recurse-submodules https://github.com/nnthanh101/1xops` | The plugin, plus the upstream base plugins pinned in `upstream/` (`plugins/operations` links to it) |
 | PyPI | `uvx 1xops doctor` | The `1xops` command line ([packages/python](packages/python/)) |
 | npm | `npx 1xops doctor` | The same command line, run through uv ([packages/npm](packages/npm/)) |
 | Container | `docker run --rm -v "$PWD:/work" ghcr.io/nnthanh101/1xops doctor` (or Docker Hub `nnthanh101/1xops`) | The same command line in a container |
@@ -45,19 +45,19 @@ Connector profiles (`aws`, `azure`, `itsm`) use only the vendors' own servers, p
 
 | Capability | For | Status |
 |---|---|---|
-| `/1ops:check`: connector readiness, with exact fixes | Platform engineers | Sprint 1 · [#5](https://github.com/nnthanh101/1ops/issues/5) |
-| `/1ops:cost-check`: top 3 AWS savings, each with \$/month and source, from read-only access | CTOs, cloud leads | Sprint 1 · [#6](https://github.com/nnthanh101/1ops/issues/6) |
-| Same check for Azure subscriptions | Engineering leads | Sprint 2 · [#7](https://github.com/nnthanh101/1ops/issues/7) |
-| CAB-ready change request from a real Terraform plan | Change managers | Sprint 2 · [#8](https://github.com/nnthanh101/1ops/issues/8) |
-| AI spend by team, vendor and seat vs API | FinOps leads | Sprint 3 · [#9](https://github.com/nnthanh101/1ops/issues/9) |
-| Executable runbooks that wait for a yes and leave evidence | On-call engineers | Sprint 4 · [#10](https://github.com/nnthanh101/1ops/issues/10) |
-| Weekly status report from the live project board | Delivery leads | Sprint 5 · [#11](https://github.com/nnthanh101/1ops/issues/11) |
+| `/1xops:check`: connector readiness, with exact fixes | Platform engineers | Sprint 1 · [#5](https://github.com/nnthanh101/1xops/issues/5) |
+| `/1xops:cost-check`: top 3 AWS savings, each with \$/month and source, from read-only access | CTOs, cloud leads | Sprint 1 · [#6](https://github.com/nnthanh101/1xops/issues/6) |
+| Same check for Azure subscriptions | Engineering leads | Sprint 2 · [#7](https://github.com/nnthanh101/1xops/issues/7) |
+| CAB-ready change request from a real Terraform plan | Change managers | Sprint 2 · [#8](https://github.com/nnthanh101/1xops/issues/8) |
+| AI spend by team, vendor and seat vs API | FinOps leads | Sprint 3 · [#9](https://github.com/nnthanh101/1xops/issues/9) |
+| Executable runbooks that wait for a yes and leave evidence | On-call engineers | Sprint 4 · [#10](https://github.com/nnthanh101/1xops/issues/10) |
+| Weekly status report from the live project board | Delivery leads | Sprint 5 · [#11](https://github.com/nnthanh101/1xops/issues/11) |
 
-Roadmap: [milestones](https://github.com/nnthanh101/1ops/milestones). Sprints run Monday to Friday.
+Roadmap: [milestones](https://github.com/nnthanh101/1xops/milestones). Sprints run Monday to Friday.
 
 ## Free vs paid
 
-| | 1ops (this repo) | OceanSoft Cloud & AI Operations |
+| | 1xops (this repo) | OceanSoft Cloud & AI Operations |
 |---|---|---|
 | Price | Free, Apache-2.0 | Fixed-price assessment, then monthly |
 | Who runs it | You, on your own systems | OceanSoft, with your team |
@@ -74,7 +74,7 @@ OceanSoft helps NZ and Australian businesses implement and maintain practical AW
 - Local first: turn on the hooks (`git config core.hooksPath .githooks`) and run the CI with [act](https://github.com/nektos/act) before a pull request: `act pull_request -W .github/workflows/validate.yml`. GitHub Actions runs only for `main`, tags, the monthly upstream bump or by hand.
 - Releases: a `v*` tag on `main` publishes PyPI, npm, ghcr.io and Docker Hub after the maintainer approves.
 - New dependencies: official vendor libraries and servers only; anything third-party needs the maintainer's approval and a line in [NOTICE](NOTICE).
-- Ideas and bugs: [open an issue](https://github.com/nnthanh101/1ops/issues).
+- Ideas and bugs: [open an issue](https://github.com/nnthanh101/1xops/issues).
 
 ## Licence
 

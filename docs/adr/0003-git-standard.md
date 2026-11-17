@@ -8,7 +8,7 @@
 | Control | In this repository |
 |---|---|
 | authorship | Commits name the owner; no `-by:` trailers |
-| hooks | `.githooks/pre-commit` and `commit-msg` are the standard copies; `pre-push` runs the 1ops quick checks; on per clone with `git config core.hooksPath .githooks` |
+| hooks | `.githooks/pre-commit` and `commit-msg` are the standard copies; `pre-push` runs the 1xops quick checks; on per clone with `git config core.hooksPath .githooks` |
 | pins | Every action is pinned to a full commit SHA, the version in a comment |
 | triggers | GitHub Actions runs only for `main`, `v*` tags, the monthly schedule or by hand; `develop` and `feature/*` are checked locally with act |
 | ci-identity | No stored cloud key; registry identity per [0002](0002-release-identity.md) |

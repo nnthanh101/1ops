@@ -1,12 +1,12 @@
-1ops
+1xops
 Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io
 
 Licensed under the Apache License, Version 2.0 (see LICENSE). This NOTICE and that
-LICENSE cover the whole repository: the plugin (plugins/1ops), the command line
+LICENSE cover the whole repository: the plugin (plugins/1xops), the command line
 (packages/python, PyPI "1xops"), the npm launcher (packages/npm, npm "1xops") and the
 container image (ghcr.io and Docker Hub "nnthanh101/1xops").
 
-"1ops", "1xops" and "OceanSoft" are trademarks of OceanSoft.io. The Apache License does not
+"1xops" and "OceanSoft" are trademarks of OceanSoft.io. The Apache License does not
 grant permission to use these names, logos or trademarks, except as required to
 describe the origin of the work (Apache-2.0, section 6).
 

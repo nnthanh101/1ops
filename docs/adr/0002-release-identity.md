@@ -1,7 +1,7 @@
 # 0002. Release identity: short-lived first, one dated waiver
 
 - Status: accepted · 2026-11-17 · owner: Nhat-Thanh Nguyen
-- Story: [#13](https://github.com/nnthanh101/1ops/issues/13)
+- Story: [#13](https://github.com/nnthanh101/1xops/issues/13)
 
 ## Context
 

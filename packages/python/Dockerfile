@@ -1,4 +1,4 @@
-# 1ops command line in a container. Build context: packages/python
+# 1xops command line in a container. Build context: packages/python
 #   docker run --rm -v "$PWD:/work" ghcr.io/nnthanh101/1xops config --scope team --connectors aws
 FROM python:3.15-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git \
