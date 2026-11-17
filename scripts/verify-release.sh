@@ -7,10 +7,12 @@ set -uo pipefail
 V=${1:?usage: verify-release.sh VERSION}
 fails=0
 logs=$(mktemp -d)
+trap 'rm -rf "$logs"' EXIT
 
 # The checks every channel must pass, run inside the container as `1xops` (one string, run by sh -c).
 CHECKS='set -e
 cd "$HOME"
+export COLUMNS=200
 v=$(1xops --version)
 1xops profiles >/dev/null
 mkdir -p org && 1xops config --scope org --out org --connectors aws azure itsm --yes >/dev/null
@@ -21,11 +23,11 @@ mkdir -p p && if 1xops config --scope local --dir p --connectors aws --yes >/dev
 [ -z "$(ls -A p)" ]
 mkdir -p first && cd first
 1xops doctor >doctor.txt 2>&1 || true
-grep -Eq "^connectors +connector +missing +no \.env\.1xops here: run 1xops setup" doctor.txt
+grep -Eq "│ connectors +│ connector +│ missing +│ no \.env\.1xops here: run 1xops setup" doctor.txt
 printf "ONEXOPS_CONNECTORS=aws\nAWS_BILLING_PROFILE=readonly\nAWS_OPERATIONS_PROFILE=readonly\n" >.env.1xops
 sum=$(cksum .env.1xops)
 1xops doctor >doctor.txt 2>&1 || true
-grep -Eq "^aws AWS_BILLING_PROFILE +connector +missing +install the AWS CLI" doctor.txt
+grep -Eq "│ aws AWS_BILLING_PROFILE +│ connector +│ missing +│ install the AWS CLI" doctor.txt
 [ "$sum" = "$(cksum .env.1xops)" ]
 grep " connector " doctor.txt >"$HOME/connectors.txt"
 echo "$v; doctor names each signed-out or missing connector with its fix and changes nothing; profiles, org config (pinned, Jira and cloud writes ask first), local scope writes nothing without the host CLI"'
@@ -61,7 +63,7 @@ row "ghcr.io/nnthanh101/1xops:$V" "ghcr.io/nnthanh101/1xops:$V" "export HOME=/tm
 # Python and Node.js must print the same connector rows. Column widths follow each container's own tool rows, so
 # spacing is normalised here; byte-for-byte equality on one machine is checked by `task test`.
 py_rows="$logs/PyPI__uv__python_3_14_.connectors" js_rows="$logs/npm__node_24_slim__no_Python_.connectors"
-norm() { sed -E 's/ +/ /g; s/ $//' "$1"; }
+norm() { grep ' connector ' "$1" | sed -E 's/ +/ /g; s/ $//'; } # stderr also holds docker's pull lines
 if [ -s "$py_rows" ] && [ "$(norm "$py_rows")" = "$(norm "$js_rows")" ]; then
   echo "| PyPI and npm print the same connector rows | pass | | spacing normalised |"
 else
