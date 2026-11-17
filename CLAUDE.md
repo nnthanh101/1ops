@@ -16,6 +16,7 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Git: work on `feature/*`, prove it with `task test` and `task ci`, stage it on `develop` (`git merge --squash`),
   delete the branch. The owner commits and pushes. Never commit, push, tag, publish or approve a deployment.
 - Guard rails advise or ask; they never block the owner.
+- Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `read-only-cloud` (plugins/1xops). The identity is the boundary; the rules only ask.
 
 ## Definition of done
 A criterion is done only when it is proven on what customers install (the published package, in a clean container)
@@ -30,4 +31,5 @@ Commits say `Refs #N`, never `Closes`. Sessions move a story to Approval at most
 | A test harness error (non-root image writing to `/`) looked like a product failure | Before reporting a failure, prove the check can pass, under the same user and paths the customer has |
 | An issue closed by `Closes #13` with criteria unproven | `Refs #N`; proof on the published artifact first |
 | A Dockerfile written from scratch on `python:3.14-slim` (386 MB, unpinned, unlocked) | Reuse the owner's platform images and their conventions first; measure before and after |
+| `1xops doctor` (17 Nov 2026) found the default Azure login on the owner's Mac can change things | Sessions never use the owner's own cloud login; read-only identity only, checked with `1xops doctor` first |
 | A blocking git hook, a GitHub App, two approvals for one release, four tasks for one goal | Least that delivers the outcome; one command, one approval |

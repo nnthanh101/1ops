@@ -28,15 +28,16 @@
 ## Get started
 
 ```bash
-uvx 1xops doctor          # what is installed and signed in, and how to fix the rest
-uvx 1xops install --yes   # install the plugin
-uvx 1xops setup           # answer a few questions; see every change before it is written
+uv tool install 1xops     # or: npm install -g 1xops  (Node.js only, no Python)
+1xops install --yes       # add the 1xops plugin to your assistant
+1xops setup               # choose connectors; every change is shown before it is written
 ```
 
-Also available through npm and as a container image. See [setup](docs/setup.md).
+Then, in your assistant, run `/1xops:check`. It shows each connector as **ready**, **signed out** or **missing**, with the exact fix, and changes nothing. The same check runs on the command line as `1xops doctor`. See [setup](docs/setup.md).
 
 ## Your data stays yours
 
+- **Read-only identities.** Connect with read-only sign-ins only: an AWS read-only role, an Azure Reader identity. `1xops doctor` shows the access of each sign-in and flags any that can change things.
 - **Read-only connections.** AWS, Azure and Jira/Confluence are connected through each vendor's own server, pinned to a known version. Azure runs in read-only mode, and every Jira or Confluence action asks first.
 - **Nothing changes until you say yes.** Every configuration change is shown first and written only when you confirm.
 - **No secrets in files.** Sign-in stays with AWS SSO, `az login` and Atlassian's own sign-in.

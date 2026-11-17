@@ -11,7 +11,7 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 
 const HELP = `Usage: 1xops <command> [options]
 
-  doctor     check prerequisites and read-only sign-in      [--aws-profile NAME]
+  doctor     check prerequisites, sign-in and connectors    [--aws-profile NAME] [--file PATH]
   install    add the marketplaces and install the plugin    [--scope user|project|local] [--yes]
   setup      guided setup: asks questions, writes ${DEFAULT_FILE}   [--file PATH]
   config     write settings and connectors for a scope      [--scope ${SCOPES.join('|')}] [--dir DIR]
@@ -33,7 +33,7 @@ if (!command || command === '--help' || command === '-h') {
 }
 
 const OPTIONS = {
-  doctor: { 'aws-profile': { type: 'string' } },
+  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE } },
   install: { scope: { type: 'string', default: 'user' }, yes: { type: 'boolean', default: false } },
   setup: { file: { type: 'string', default: DEFAULT_FILE } },
   config: {

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cf from '../src/config-file.mjs';
 import * as s from '../src/settings.mjs';
-import { accessFromRole, mask, scrub } from '../src/commands.mjs';
+import { accessFromRole, awsFix, azureAccess, checkConnectors, mask, scrub } from '../src/commands.mjs';
 
 const BIN = fileURLToPath(new URL('../bin/1xops.mjs', import.meta.url));
 const tmp = () => mkdtempSync(path.join(os.tmpdir(), '1xops-'));
@@ -151,4 +151,28 @@ test('accessFromRole tells read-only from roles that can change things', () => {
   assert.equal(accessFromRole('arn:aws:iam::123456789012:root'), 'write');
   assert.equal(accessFromRole(arn('ops')), 'unknown');
   assert.equal(accessFromRole(undefined), 'unknown');
+});
+
+// Real AWS CLI error text, captured on 2026-11-17 (account IDs removed).
+const EXPIRED = 'aws: [ERROR]: Error when retrieving token from sso: Token has expired and refresh failed';
+const NOT_FOUND = 'aws: [ERROR]: The config profile (p) could not be found';
+const NO_CREDS = 'aws: [ERROR]: An error occurred (NoCredentials): Unable to locate credentials. You can configure credentials by running "aws login".';
+
+test('awsFix names the exact command', () => {
+  assert.deepEqual(awsFix(EXPIRED, 'p'), ['signed out', 'aws sso login --profile p']);
+  assert.deepEqual(awsFix(NO_CREDS, 'p'), ['signed out', 'aws sso login --profile p']);
+  assert.equal(awsFix(NOT_FOUND, 'p')[0], 'missing');
+  assert.deepEqual(awsFix('aws: [ERROR]: other', 'p'), ['check', 'other']);
+});
+
+test('azureAccess', () => {
+  assert.equal(azureAccess(['Reader', 'Cost Management Reader']), 'read');
+  assert.equal(azureAccess(['Reader', 'Contributor']), 'write');
+  assert.equal(azureAccess(['User Access Administrator']), 'write');
+  assert.equal(azureAccess([]), 'unknown');
+});
+
+test('doctor without a settings file says run setup', () => {
+  const f = path.join(tmp(), '.env.1xops');
+  assert.deepEqual(checkConnectors(f), [['connectors', 'missing', `no ${f} here: run 1xops setup`]]);
 });

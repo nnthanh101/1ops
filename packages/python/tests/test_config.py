@@ -205,3 +205,29 @@ def test_scrub_masks_every_12_digit_account_id():
 )
 def test_access_from_role(arn, access):
     assert cli.access_from_role(arn) == access
+
+
+# Real AWS CLI error text, captured on 2026-11-17 (account IDs removed).
+EXPIRED = "aws: [ERROR]: Error when retrieving token from sso: Token has expired and refresh failed"
+NOT_FOUND = "aws: [ERROR]: The config profile (p) could not be found"
+NO_CREDS = 'aws: [ERROR]: An error occurred (NoCredentials): Unable to locate credentials. You can configure credentials by running "aws login".'
+
+
+def test_aws_fix_names_the_exact_command():
+    assert cli.aws_fix(EXPIRED, "p") == ("signed out", "aws sso login --profile p")
+    assert cli.aws_fix(NO_CREDS, "p") == ("signed out", "aws sso login --profile p")
+    assert cli.aws_fix(NOT_FOUND, "p")[0] == "missing"
+    assert cli.aws_fix("aws: [ERROR]: other", "p") == ("check", "other")
+
+
+def test_azure_access():
+    assert cli.azure_access(["Reader", "Cost Management Reader"]) == "read"
+    assert cli.azure_access(["Reader", "Contributor"]) == "write"
+    assert cli.azure_access(["User Access Administrator"]) == "write"
+    assert cli.azure_access([]) == "unknown"
+
+
+def test_doctor_without_settings_file_says_run_setup(tmp_path: Path):
+    assert cli.check_connectors(str(tmp_path / ".env.1xops")) == [
+        ("connectors", "missing", f"no {tmp_path / '.env.1xops'} here: run 1xops setup")
+    ]
