@@ -43,10 +43,41 @@ export function accessFromRole(arn = '') {
 const ACCESS = { read: 'read-only', write: 'can change things: use a read-only role', unknown: 'access unknown: use a read-only role' };
 
 // The same look as the Python CLI's rich table: a heavy header, light rows, colour on a terminal. No dependency.
+// On a terminal the table fits the window: the widest columns shrink and their cells wrap, as rich does.
+// Piped (the assistant, evidence) it sizes to its content, so both CLIs print the same bytes.
 const visible = (s) => String(s).replace(/\x1b\[[0-9;]*m/g, '').length;
+function wrap(text, w) {
+  if (visible(text) <= w) return [String(text)];
+  // A coloured cell wraps on its plain text; each line then gets the colour again, so no code is cut or bleeds.
+  const styled = String(text).match(/^(\x1b\[[0-9;]*m)(.*?)(\x1b\[[0-9;]*m)$/s);
+  if (styled) return wrap(styled[2], w).map((l) => styled[1] + l + styled[3]);
+  const lines = [];
+  let line = '';
+  for (const word of String(text).split(' ')) {
+    for (let piece = word; piece.length; ) {
+      const room = line ? w - line.length - 1 : w;
+      if (piece.length <= room) { line = line ? `${line} ${piece}` : piece; piece = ''; }
+      else if (line) { lines.push(line); line = ''; }
+      else { lines.push(piece.slice(0, w)); piece = piece.slice(w); }
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
 function table(title, columns, rows) {
   const width = columns.map((c, i) => Math.max(c.length, ...rows.map((r) => visible(r[i]))));
-  const cells = (r, bar) => `${bar} ${r.map((c, i) => String(c) + ' '.repeat(width[i] - visible(c))).join(` ${bar} `)} ${bar}`;
+  const limit = process.stdout.isTTY ? (process.stdout.columns || 80) - (3 * width.length + 1) : Infinity;
+  while (width.reduce((a, w) => a + w, 0) > limit) {
+    const i = width.indexOf(Math.max(...width));
+    if (width[i] <= 8) break;
+    width[i] -= 1;
+  }
+  const pad = (c, i) => String(c) + ' '.repeat(Math.max(0, width[i] - visible(c)));
+  const cells = (r, bar) => {
+    const parts = r.map((c, i) => wrap(c, width[i]));
+    const height = Math.max(...parts.map((p) => p.length));
+    return Array.from({ length: height }, (_, k) => `${bar} ${parts.map((p, i) => pad(p[k] ?? '', i)).join(` ${bar} `)} ${bar}`).join('\n');
+  };
   const rule = (l, m, r, h) => l + width.map((w) => h.repeat(w + 2)).join(m) + r;
   const total = width.reduce((a, w) => a + w + 3, 1);
   const left = Math.max(0, Math.floor((total - title.length) / 2));
@@ -172,8 +203,16 @@ export function doctor(opts, version) {
   if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
   shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
+  // Required tools and configured connectors that are not ok or ready. Optional tools stay in the table only.
+  const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[1] !== 'optional');
   for (const r of shown) r[2] = color(RESULT_STYLE[r[2]], r[2]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
+  // What to do next, in table order (see todo above).
+  if (!todo.length) console.log(color('green', 'All set: nothing to fix.'));
+  else {
+    console.log(color('bold', 'Next:'));
+    todo.forEach((r, i) => console.log(`  ${i + 1}. ${r[0]}: ${r[3]}`));
+  }
   const failed = rows.filter((r) => r[1] && !r[2]).map((r) => r[0]);
   if (failed.length) {
     console.log(color('red', `Required: ${failed.join(', ')}`));
@@ -220,21 +259,21 @@ function diffLines(a, b) {
   let i = 0, j = 0;
   while (i < n || j < m) {
     if (i < n && j < m && a[i] === b[j]) { out.push(` ${a[i]}`); i++; j++; }
-    else if (j < m && (i === n || lcs[i][j + 1] >= lcs[i + 1][j])) out.push(`+${b[j++]}`);
-    else out.push(`-${a[i++]}`);
+    else if (i < n && (j === m || lcs[i + 1][j] >= lcs[i][j + 1])) out.push(`-${a[i++]}`); // removed first, as difflib
+    else out.push(`+${b[j++]}`);
   }
   return out;
 }
 
-function showChange(file, before, after) {
+function showChange(file, before, after, linesToo = true) {
   if (s.dumps(before) === s.dumps(after)) {
     console.log(color('dim', `${file}: already up to date`));
     return false;
   }
-  console.log(`--- ${file}\n+++ ${file}`);
-  for (const l of diffLines(s.dumps(before).trimEnd().split('\n'), s.dumps(after).trimEnd().split('\n'))) {
-    if (l[0] !== ' ') console.log(l);
-  }
+  const lines = diffLines(s.dumps(before).trimEnd().split('\n'), s.dumps(after).trimEnd().split('\n')).filter((l) => l[0] !== ' ');
+  const added = lines.filter((l) => l[0] === '+').length;
+  console.log(color('bold', `${file}: ${added} lines added, ${lines.length - added} removed`));
+  if (linesToo) for (const l of lines) console.log(color(l[0] === '+' ? 'green' : 'red', l));
   return true;
 }
 
@@ -280,7 +319,7 @@ export function config(opts) {
   const target = s.settingsPath(scope, project, out);
   const before = s.readJson(target);
   const after = s.merge(before, wanted);
-  if (showChange(target, before, after)) planned.push([target, after]);
+  if (showChange(target, before, after, opts.preview !== 'summary')) planned.push([target, after]);
 
   const hostCmds = [];
   if (Object.keys(servers).length) {
@@ -288,7 +327,7 @@ export function config(opts) {
     if (mcpFile) {
       const b = s.readJson(mcpFile);
       const a = s.merge(b, { mcpServers: servers });
-      if (showChange(mcpFile, b, a)) planned.push([mcpFile, a]);
+      if (showChange(mcpFile, b, a, opts.preview !== 'summary')) planned.push([mcpFile, a]);
     } else {
       const hostScope = scope === 'personal' ? 'user' : 'local';
       for (const [name, spec] of Object.entries(servers)) {
@@ -299,7 +338,7 @@ export function config(opts) {
   }
 
   if (!opts.yes) {
-    console.log('Dry run. Re-run with --yes to write these changes.');
+    if (!opts.preview) console.log('Dry run. Re-run with --yes to write these changes.');
     return 0;
   }
   if (hostCmds.length && !which(s.HOST)) {
@@ -396,6 +435,13 @@ export function readOnlyProfiles() {
   return found.sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
+const SCOPE_HELP = {
+  org: 'managed files for IT, every person in the organisation',
+  team: 'a shared project or tenant folder',
+  local: 'you, in this project only',
+  personal: 'you, in every project',
+};
+
 export async function setup(opts) {
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
   const lines = rl[Symbol.asyncIterator]();
@@ -412,30 +458,52 @@ export async function setup(opts) {
   try {
     const file = opts.file;
     console.log(`${color('bold', '1xops setup')} — non-secret values only; secrets stay in your sign-in.\n`);
+    table('Who the settings are for', ['scope', 'for'], s.SCOPES.map((n) => [n, SCOPE_HELP[n]]));
     let scope;
-    do scope = await ask(`Scope (${s.SCOPES.join(' | ')})`, 'team'); while (!s.SCOPES.includes(scope));
+    do scope = await ask(`Scope (${s.SCOPES.join('/')})`, 'team'); while (!s.SCOPES.includes(scope));
     const conf = { scope };
     if (scope === 'team' || scope === 'local') conf.dir = await ask('Project or tenant folder', '.');
     if (scope === 'org') conf.out = await ask('Folder to write the managed files to', '.');
     const found = detect();
     const connectors = {};
+    let listed = false;
     for (const name of s.builtinProfiles()) {
       const profile = s.loadProfile(name);
       if (!(await yes(`Add ${name}: ${profile.description ?? ''}?`, false))) continue;
       const values = {};
       for (const v of cf.variables(profile)) {
         if (v.endsWith('_PROFILE')) {
-          // Pick a read-only AWS profile by number. No typing: a mistyped or admin profile cannot get in.
+          // Pick a read-only AWS profile: by number, or type part of a name to filter. A name outside the read-only
+          // list cannot get in. The list is shown once; later questions refer to it.
           const options = readOnlyProfiles();
           if (!options.length) {
-            console.log(`  ${v}: no read-only AWS profile found in ~/.aws/config. Create one (an SSO role such as ReadOnlyAccess) with: aws configure sso. This connector will show as missing in /1xops:check until then.`);
+            if (!listed) { // say it once, not once per variable
+              console.log('  No read-only AWS profile in ~/.aws/config yet.');
+              console.log('  Create one with: aws configure sso (a role such as ReadOnlyAccess).');
+              console.log('  Until then /1xops:check shows this connector as missing.');
+              listed = true;
+            }
             continue;
           }
-          console.log(`  ${v}: read-only profiles only`);
-          options.forEach(([n, acct, role], i) => console.log(`    ${i + 1}) ${n}  ${acct}  ${role}`));
-          let pick;
-          do pick = await ask('  Number (Enter to skip)'); while (pick && !(Number(pick) >= 1 && Number(pick) <= options.length));
-          if (pick) values[v] = options[Number(pick) - 1][0];
+          const numbered = options.map((o, i) => [i + 1, o]);
+          const show = (rows, title) => table(title, ['#', 'profile', 'account', 'role'], rows.map(([n, [name, acct, role]]) => [String(n).padStart(String(options.length).length), name, acct, role]));
+          if (!listed) { show(numbered, `Read-only AWS profiles (${options.length})`); listed = true; }
+          const current = numbered.find(([, [name]]) => name === process.env[v]);
+          const hint = current ? `Enter keeps ${current[0]}, - skips` : 'Enter skips';
+          for (;;) {
+            const pick = (await ask(`  ${v}: number or part of a name (${hint})`, current ? String(current[0]) : '')).trim();
+            if (!pick || pick === '-') break;
+            if (/^\d+$/.test(pick)) {
+              if (Number(pick) >= 1 && Number(pick) <= options.length) { values[v] = options[Number(pick) - 1][0]; break; }
+              console.log(`  No profile number ${pick}: pick 1 to ${options.length}.`);
+              continue;
+            }
+            const q = pick.toLowerCase();
+            const matches = numbered.filter(([, [name, , role]]) => name.toLowerCase().includes(q) || role.toLowerCase().includes(q));
+            if (matches.length === 1) { values[v] = matches[0][1][0]; break; }
+            if (matches.length) show(matches, `Matching '${pick}' (${matches.length})`);
+            else console.log(`  No read-only profile matches '${pick}'.`);
+          }
           continue;
         }
         const value = await ask(`  ${v} (blank to skip)`, process.env[v] || found[v] || '');
@@ -448,14 +516,15 @@ export async function setup(opts) {
     conf.connectors = connectors;
 
     const text = cf.dump(conf);
-    console.log(`\n${file}\n${text}`);
+    console.log(`\n${color('bold', file)}\n${text}`);
     if (existsSync(file) && !(await yes(`${file} exists. Replace it?`, false))) return 1;
     if (!(await yes(`Write ${file}?`, true))) return 1;
     write(file, text);
     cf.load(file); // same checks as `1xops config --file`
 
     console.log('\nChanges this would make:');
-    if (config({ file }) !== 0) return 2;
+    if (config({ file, preview: 'summary' }) !== 0) return 2;
+    if (await yes('Show every line first?', false)) config({ file, preview: 'full' });
     if (await yes('Apply them now?', false)) return config({ file, yes: true });
     console.log(`Apply later with: 1xops config --file ${file} --yes`);
     return 0;

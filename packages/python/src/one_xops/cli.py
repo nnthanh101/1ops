@@ -6,7 +6,6 @@ Nothing is changed unless you pass --yes; without it each command shows what it 
 from __future__ import annotations
 
 import argparse
-import difflib
 import json
 import os
 import re
@@ -26,6 +25,10 @@ from one_xops import settings as s
 from one_xops import setup as wizard
 
 console = Console()
+if (
+    not console.is_terminal
+):  # piped (the assistant, evidence): size to content, never wrap like a terminal
+    console = Console(width=400)
 
 INSTALL_STEPS = [
     [s.HOST, "plugin", "marketplace", "add", "anthropics/knowledge-work-plugins"],
@@ -301,11 +304,28 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         style = RESULT_STYLE[result]
         table.add_row(name, needed, Text(result, style=style), Text(scrub(detail)))
     console.print(table)
+    for line in next_steps(shown):
+        console.print(line, soft_wrap=True)
     failed = [r[0] for r in rows if r[1] and not r[2]]
     if failed:
-        console.print(Text(f"Required: {', '.join(failed)}", style="red"))
+        console.print(Text(f"Required: {', '.join(failed)}", style="red"), soft_wrap=True)
         return 1
     return 0
+
+
+def next_steps(shown: list[tuple[str, str, str, str]]) -> list[Text]:
+    """What to do next, in table order: required tools and configured connectors that are not ok or ready.
+    Optional tools stay in the table only."""
+    todo = [
+        (name, scrub(detail))
+        for name, needed, result, detail in shown
+        if result not in ("ok", "ready") and needed != "optional"
+    ]
+    if not todo:
+        return [Text("All set: nothing to fix.", style="green")]
+    return [Text("Next:", style="bold")] + [
+        Text(f"  {n}. {name}: {fix}") for n, (name, fix) in enumerate(todo, 1)
+    ]
 
 
 # ── install ─────────────────────────────────────────────────────────────────
@@ -332,18 +352,43 @@ def cmd_install(args: argparse.Namespace) -> int:
 # ── config ──────────────────────────────────────────────────────────────────
 
 
-def _show_change(path: Path, before: dict, after: dict) -> bool:
+def diff_lines(a: list[str], b: list[str]) -> list[str]:
+    """A line diff by longest common subsequence, removed lines first: the same algorithm as the Node.js CLI
+    (diffLines in commands.mjs), so both print the same preview for any file. Settings files are small."""
+    n, m = len(a), len(b)
+    lcs = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        for j in range(m - 1, -1, -1):
+            lcs[i][j] = lcs[i + 1][j + 1] + 1 if a[i] == b[j] else max(lcs[i + 1][j], lcs[i][j + 1])
+    out, i, j = [], 0, 0
+    while i < n or j < m:
+        if i < n and j < m and a[i] == b[j]:
+            out.append(f" {a[i]}")
+            i, j = i + 1, j + 1
+        elif i < n and (j == m or lcs[i + 1][j] >= lcs[i][j + 1]):
+            out.append(f"-{a[i]}")
+            i += 1
+        else:
+            out.append(f"+{b[j]}")
+            j += 1
+    return out
+
+
+def _show_change(path: Path, before: dict, after: dict, lines_too: bool = True) -> bool:
     if before == after:
-        console.print(f"[dim]{path}: already up to date[/]")
+        console.print(Text(f"{path}: already up to date", style="dim"), soft_wrap=True)
         return False
-    diff = difflib.unified_diff(
-        s.dumps(before).splitlines(),
-        s.dumps(after).splitlines(),
-        fromfile=str(path),
-        tofile=str(path),
-        lineterm="",
+    lines = [
+        line
+        for line in diff_lines(s.dumps(before).splitlines(), s.dumps(after).splitlines())
+        if line[0] != " "
+    ]
+    added, removed = sum(line[0] == "+" for line in lines), sum(line[0] == "-" for line in lines)
+    console.print(
+        Text(f"{path}: {added} lines added, {removed} removed", style="bold"), soft_wrap=True
     )
-    console.print("\n".join(diff), markup=False, highlight=False)
+    for line in lines if lines_too else []:
+        console.print(Text(line, style="green" if line[0] == "+" else "red"), soft_wrap=True)
     return True
 
 
@@ -382,7 +427,7 @@ def cmd_config(args: argparse.Namespace) -> int:
     target = s.settings_path(scope, project, out)
     before = s.read_json(target)
     after = s.merge(before, wanted)
-    if _show_change(target, before, after):
+    if _show_change(target, before, after, args.preview != "summary"):
         planned.append((target, after))
 
     host_cmds: list[list[str]] = []
@@ -391,7 +436,7 @@ def cmd_config(args: argparse.Namespace) -> int:
         if mcp_file:
             before = s.read_json(mcp_file)
             after = s.merge(before, {"mcpServers": servers})
-            if _show_change(mcp_file, before, after):
+            if _show_change(mcp_file, before, after, args.preview != "summary"):
                 planned.append((mcp_file, after))
         else:
             host_scope = "user" if scope == "personal" else "local"
@@ -402,7 +447,8 @@ def cmd_config(args: argparse.Namespace) -> int:
                 console.print(f"[bold]$ {s.HOST} mcp add-json -s {host_scope} {name} '…'[/]")
 
     if not args.yes:
-        console.print("Dry run. Re-run with --yes to write these changes.")
+        if not args.preview:
+            console.print("Dry run. Re-run with --yes to write these changes.")
         return 0
     if host_cmds and not shutil.which(s.HOST):
         console.print(
@@ -498,6 +544,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--file", help="read scope, folder and connector values from .env.1xops")
     p.add_argument("--yes", action="store_true", help="write the changes (default: show a diff)")
+    # used by setup: "summary" shows each file's line counts, "full" every line; neither prints the dry-run hint
+    p.add_argument("--preview", choices=("summary", "full"), help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_config)
 
     p = sub.add_parser("env", help="print export lines for the values in .env.1xops")

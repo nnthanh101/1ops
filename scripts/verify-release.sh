@@ -32,19 +32,27 @@ grep -Eq "│ aws AWS_BILLING_PROFILE +│ connector +│ missing +│ install t
 grep " connector " doctor.txt >"$HOME/connectors.txt"
 echo "$v; doctor names each signed-out or missing connector with its fix and changes nothing; profiles, org config (pinned, Jira and cloud writes ask first), local scope writes nothing without the host CLI"'
 
-row() { # channel, image, install command (the README's), extra docker args
+row() { # channel, image, install command (the README's), extra docker args, "registry serves it" check
   local key=${1//[^A-Za-z0-9]/_} start code out secs
   local log="$logs/$key.log"
-  start=$(date +%s)
-  # shellcheck disable=SC2086
-  docker run --rm --pull always $4 --entrypoint sh "$2" -c "set -e; $3; $CHECKS; cat \$HOME/connectors.txt >&2" >"$log" 2>"$logs/$key.connectors"
-  code=$?
-  secs=$(( $(date +%s) - start ))
-  out=$(sed -n '$p' "$log")
+  # Registry edges lag a new version by minutes: a failed channel is tried again (up to 10 times, 30 s apart)
+  # only while its registry does not serve the version yet. Once it does, a failure is real and reported at once.
+  for try in 1 2 3 4 5 6 7 8 9 10; do
+    start=$(date +%s)
+    # shellcheck disable=SC2086
+    docker run --rm --pull always $4 --entrypoint sh "$2" -c "set -e; $3; $CHECKS; cat \$HOME/connectors.txt >&2" >"$log" 2>"$logs/$key.connectors"
+    code=$?
+    secs=$(( $(date +%s) - start ))
+    out=$(sed -n '$p' "$log")
+    [ "$code" -eq 0 ] && [ -n "$out" ] && break
+    eval "$5" >/dev/null 2>&1 && break
+    [ "$try" -lt 10 ] && sleep 30
+  done
+  secs="${secs}s"; [ "$try" -gt 1 ] && secs="$secs (try $try)"
   if [ "$code" -eq 0 ] && [[ "$out" == "1xops $V;"* ]]; then
-    echo "| $1 | pass | ${secs}s | $out |"
+    echo "| $1 | pass | $secs | $out |"
   else
-    echo "| $1 | **FAIL** (exit $code) | ${secs}s | ${out:-no output} |"; fails=$((fails + 1))
+    echo "| $1 | **FAIL** (exit $code) | $secs | ${out:-no output} |"; fails=$((fails + 1))
   fi
 }
 
@@ -54,17 +62,19 @@ echo "| Channel | Result | Seconds, pull to result | Output |"
 echo "|---|---|---|---|"
 U='--user 1000:1000 -e HOME=/tmp/home'
 row "PyPI (uv, python 3.14)" ghcr.io/astral-sh/uv:python3.14-trixie-slim \
-  "mkdir -p \$HOME; unset UV_TOOL_BIN_DIR; uv tool install -q 1xops==$V >/dev/null 2>&1; export PATH=\$HOME/.local/bin:\$PATH" "$U"
+  "mkdir -p \$HOME; unset UV_TOOL_BIN_DIR; uv tool install -q 1xops==$V >/dev/null 2>&1; export PATH=\$HOME/.local/bin:\$PATH" "$U" \
+  "curl -sf -H 'Accept: application/vnd.pypi.simple.v1+json' https://pypi.org/simple/1xops/ | grep -q '\"$V\"'"
 row "npm (node:24-slim, no Python)" node:24-slim \
-  "mkdir -p \$HOME; npm install -g --silent --prefix \$HOME/.npm 1xops@$V >/dev/null 2>&1; export PATH=\$HOME/.npm/bin:\$PATH" "$U"
-row "Docker Hub nnthanh101/1xops:$V" "nnthanh101/1xops:$V" "export HOME=/tmp/home; mkdir -p \$HOME" ""
-row "ghcr.io/nnthanh101/1xops:$V" "ghcr.io/nnthanh101/1xops:$V" "export HOME=/tmp/home; mkdir -p \$HOME" ""
+  "mkdir -p \$HOME; npm install -g --silent --prefix \$HOME/.npm 1xops@$V >/dev/null 2>&1; export PATH=\$HOME/.npm/bin:\$PATH" "$U" \
+  "curl -sfI https://registry.npmjs.org/1xops/-/1xops-$V.tgz"
+row "Docker Hub nnthanh101/1xops:$V" "nnthanh101/1xops:$V" "export HOME=/tmp/home; mkdir -p \$HOME" "" "docker buildx imagetools inspect nnthanh101/1xops:$V"
+row "ghcr.io/nnthanh101/1xops:$V" "ghcr.io/nnthanh101/1xops:$V" "export HOME=/tmp/home; mkdir -p \$HOME" "" "docker buildx imagetools inspect ghcr.io/nnthanh101/1xops:$V"
 
 # Python and Node.js must print the same connector rows. Column widths follow each container's own tool rows, so
 # spacing is normalised here; byte-for-byte equality on one machine is checked by `task test`.
 py_rows="$logs/PyPI__uv__python_3_14_.connectors" js_rows="$logs/npm__node_24_slim__no_Python_.connectors"
 norm() { grep ' connector ' "$1" | sed -E 's/ +/ /g; s/ $//'; } # stderr also holds docker's pull lines
-if [ -s "$py_rows" ] && [ "$(norm "$py_rows")" = "$(norm "$js_rows")" ]; then
+if [ -n "$(norm "$py_rows")" ] && [ "$(norm "$py_rows")" = "$(norm "$js_rows")" ]; then # empty is a failure
   echo "| PyPI and npm print the same connector rows | pass | | spacing normalised |"
 else
   echo "| PyPI and npm print the same connector rows | **FAIL** | | differ or empty |"; fails=$((fails + 1))

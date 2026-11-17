@@ -1,6 +1,7 @@
 ---
 name: read-only-cloud
 description: Use before any AWS or Azure command or connector call (aws, az, the AWS or Azure MCP servers). Keeps the work read-only. Check the sign-in's access first, use read operations only, and turn any change into a proposal the person approves.
+allowed-tools: Bash(1xops doctor:*)
 ---
 
 # Read-only AWS and Azure

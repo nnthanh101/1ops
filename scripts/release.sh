@@ -3,7 +3,8 @@
 # the version bump, merges into main and pushes a tag, and running it is the owner's yes. VERSION defaults to the next
 # patch after the latest tag. Local first: the tests, the Release workflow's tests (act) and the image build run on this
 # machine before anything is pushed. Then it merges develop into main once green, tags vVERSION, waits for the owner's one
-# approval and the publish, installs the release from every channel in clean containers, and posts that proof on STORY.
+# approval and the publish, installs the release from every channel in clean containers, and keeps that proof in tmp/
+# (never posted: proof output can carry customer or tenant names). STORY only tags the version commit.
 # Used by `task release`.
 set -euo pipefail
 R=nnthanh101/1xops
@@ -19,14 +20,8 @@ git rev-parse -q --verify "refs/tags/v$V" >/dev/null && { echo "release: v$V alr
 echo "release: v$V (latest released: v${last:-none})"
 
 mkdir -p tmp
-echo "release: local check 1/3, tests"
-task test >/dev/null || { echo "release: tests fail; run task test"; exit 1; }
-echo "release: local check 2/3, the Release workflow's tests with act"
-act pull_request -W .github/workflows/release.yml --rm >tmp/act-release.log 2>&1 || { echo "release: the tests fail under act; see tmp/act-release.log"; exit 1; }
-echo "release: local check 3/3, the image"
-docker build -q --build-arg VERSION="$V" -t "1xops:release-check" packages/python >/dev/null \
-  && [ "$(docker run --rm 1xops:release-check --version)" = "1xops $(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)" ] \
-  || { echo "release: the image does not build or run"; exit 1; }
+echo "release: local first - task gate (lint, tests, act, image, every command as a customer sees it)"
+task gate >tmp/gate-release.log 2>&1 || { echo "release: task gate fails; see tmp/gate-release.log"; exit 1; }
 
 py=$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
 js=$(node -p "require('./packages/npm/package.json').version")
@@ -69,6 +64,5 @@ for _ in $(seq 30); do
 done
 proof=tmp/evidence-$V.md
 set +e; bash scripts/verify-release.sh "$V" | tee "$proof"; failed=${PIPESTATUS[0]}; set -e
-[ -n "$STORY" ] && gh issue comment "$STORY" -R $R --body-file "$proof"
 [ "$failed" -eq 0 ] || { echo "release: v$V is published but $failed check(s) failed; the story stays open"; exit 1; }
-echo "release: v$V shipped and proven${STORY:+; proof posted on #$STORY}"
+echo "release: v$V shipped and proven; proof in $proof (local, not posted)"
