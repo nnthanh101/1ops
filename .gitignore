@@ -1,0 +1,11 @@
+.venv/
+dist/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.secrets
+node_modules/
+*.tgz
+.DS_Store
+1ops.yaml

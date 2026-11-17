@@ -1,0 +1,5 @@
+# act: run the GitHub workflows locally to save Actions minutes.
+#   act pull_request -W .github/workflows/validate.yml
+#   act workflow_dispatch -W .github/workflows/release.yml --secret-file .secrets
+--container-architecture linux/amd64
+-P ubuntu-latest=nnthanh101/runbooks:latest

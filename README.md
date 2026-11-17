@@ -22,6 +22,25 @@
 
 `/1ops:check` lists each configured connector as ready, signed out or missing, and how to fix it. The plugin declares its one dependency (the free base `operations` plugin) in the [plugin manifest](plugins/1ops/).
 
+### Other ways to get 1ops
+
+| Channel | Command | What you get |
+|---|---|---|
+| git | `git clone --recurse-submodules https://github.com/nnthanh101/1ops` | The plugin, plus the upstream base plugins pinned in `upstream/` (`plugins/operations` links to it) |
+| PyPI | `uvx 1ops doctor` | The 1ops command line ([packages/python](packages/python/)) |
+| npm | `npx 1ops doctor` | The same command line, run through uv ([packages/npm](packages/npm/)) |
+| Docker | `docker run --rm -v "$PWD:/work" nnthanh101/1ops doctor` | The same command line in a container |
+
+The command line sets up the plugin, settings and read-only connectors for a whole organisation, a team or tenant folder, one project, or one person:
+
+```bash
+1ops doctor                                              # prerequisites and read-only sign-in
+1ops install --yes                                       # marketplaces + plugin
+1ops config --scope team --connectors aws azure itsm     # shows a diff; add --yes to write
+```
+
+Connector profiles (`aws`, `azure`, `itsm`) use only the vendors' own servers, pinned to exact versions, in read-only mode where the server offers one. Bring your own profile with `--connectors ./my-profile.json`.
+
 ## What it does
 
 | Capability | For | Status |
@@ -51,7 +70,9 @@ OceanSoft helps NZ and Australian businesses implement and maintain practical AW
 
 - Branches: `feature/*` → pull request into `develop`; `main` receives releases only.
 - One capability per pull request, proven on a real asset. Fixtures are for tests only.
-- CI runs strict plugin validation on every pull request.
+- CI runs strict plugin validation, the Python tests, the npm package check and the Docker build on every pull request. Run the same locally with [act](https://github.com/nektos/act): `act pull_request -W .github/workflows/validate.yml`.
+- Releases: a `v*` tag on `main` publishes PyPI, npm and Docker Hub after the release approver accepts. The upstream pin is bumped monthly by pull request.
+- New dependencies: official vendor libraries and servers only; anything third-party needs the maintainer's approval first.
 - Ideas and bugs: [open an issue](https://github.com/nnthanh101/1ops/issues).
 
 ## Licence

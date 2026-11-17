@@ -1,6 +1,7 @@
 name: Validate
 
-# The marketplace and every plugin validate in strict mode with the pinned CLI.
+# Runs on every PR and on develop/main. Builds everything, publishes nothing.
+# Locally, without Actions minutes: act pull_request -W .github/workflows/validate.yml
 on:
   pull_request:
   push:
@@ -10,12 +11,58 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  validate: # plugin + marketplace; job name kept for branch protection
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict .
+      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict plugins/1ops
+      - name: Upstream symlink resolves
+        run: test -f plugins/operations/.claude-plugin/plugin.json
+
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Licence copies match the root
+        run: cmp LICENSE ../../LICENSE && cmp NOTICE ../../NOTICE
+      - run: uv sync --locked --group dev
+      - run: uv run ruff check src tests && uv run ruff format --check src tests
+      - run: uv run pytest -q
+      - run: uv build
+      - name: Wheel runs
+        run: uv run --isolated --with dist/*.whl 1ops --version
+
+  npm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/npm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
-      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict .
-      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict plugins/1ops
+          node-version: 26
+      - name: Versions match and licence copies match the root
+        run: |
+          cmp LICENSE ../../LICENSE && cmp NOTICE ../../NOTICE
+          py=$(grep -E '^version = ' ../python/pyproject.toml | cut -d'"' -f2)
+          js=$(node -p "require('./package.json').version")
+          test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
+      - run: npm pack --dry-run
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -t 1ops:ci packages/python
+      - run: docker run --rm 1ops:ci --version

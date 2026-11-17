@@ -1,0 +1,93 @@
+name: Release
+
+# Publishes PyPI, npm and Docker Hub from a v* tag on main, after a named approver
+# accepts the `release` environment. The same jobs run locally with act:
+#   act workflow_dispatch -W .github/workflows/release.yml --secret-file .secrets
+# Secrets (set by the owner, never committed):
+#   PYPI_TOKEN       only for act; on GitHub, PyPI trusted publishing (OIDC) is used
+#   NPM_TOKEN        npm automation token
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: v
+        name: Tag, pyproject and package.json agree; commit is on main
+        run: |
+          py=$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
+          js=$(node -p "require('./packages/npm/package.json').version")
+          test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            test "${GITHUB_REF#refs/tags/v}" = "$py" || { echo "tag != $py"; exit 1; }
+          fi
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "commit is not on main"; exit 1; }
+          echo "version=$py" >> "$GITHUB_OUTPUT"
+
+  pypi:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: uv build
+        working-directory: packages/python
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: packages/python/dist
+          password: ${{ secrets.PYPI_TOKEN }} # empty on GitHub → trusted publishing
+
+  npm:
+    needs: [check, pypi] # the npm launcher runs the PyPI version, so PyPI goes first
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages/npm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          registry-url: https://registry.npmjs.org
+      - run: npm publish --access public $([ "$ACT" = "true" ] || echo --provenance)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  docker:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: packages/python
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            nnthanh101/1ops:${{ needs.check.outputs.version }}
+            nnthanh101/1ops:latest
