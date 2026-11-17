@@ -105,8 +105,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/nnthanh101/1ops:${{ needs.check.outputs.version }}
-            ghcr.io/nnthanh101/1ops:latest
-            nnthanh101/1ops:${{ needs.check.outputs.version }}
-            nnthanh101/1ops:latest
+            ghcr.io/nnthanh101/1xops:${{ needs.check.outputs.version }}
+            ghcr.io/nnthanh101/1xops:latest
+            nnthanh101/1xops:${{ needs.check.outputs.version }}
+            nnthanh101/1xops:latest
           labels: org.opencontainers.image.source=https://github.com/nnthanh101/1ops

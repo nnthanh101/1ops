@@ -3,12 +3,12 @@
 Command line for [1ops by OceanSoft.io](https://github.com/nnthanh101/1ops): checks prerequisites, installs the 1ops plugin, and writes settings and read-only cloud connectors for an organisation, a team (or tenant folder), a project, or one person.
 
 ```bash
-uvx 1ops doctor                       # prerequisites and read-only sign-in (account IDs masked)
-uvx 1ops install --yes                # add the marketplaces and install the plugin
-uvx 1ops setup                        # guided: asks a few questions, writes 1ops.yaml, shows the diff
-uvx 1ops profiles                     # built-in connector profiles: aws, azure, itsm
-uvx 1ops config --scope team --connectors aws itsm          # shows a diff
-uvx 1ops config --scope team --connectors aws itsm --yes    # writes it
+uvx 1xops doctor                       # prerequisites and read-only sign-in (account IDs masked)
+uvx 1xops install --yes                # add the marketplaces and install the plugin
+uvx 1xops setup                        # guided: asks a few questions, writes 1ops.yaml, shows the diff
+uvx 1xops profiles                     # built-in connector profiles: aws, azure, itsm
+uvx 1xops config --scope team --connectors aws itsm          # shows a diff
+uvx 1xops config --scope team --connectors aws itsm --yes    # writes it
 ```
 
 | Scope | Writes | Who it is for |
@@ -35,12 +35,12 @@ connectors:
 ```
 
 ```bash
-1ops config --file 1ops.yaml --yes    # apply it
-eval "$(1ops env)"                    # team/org: load your values into the shell
+1xops config --file 1ops.yaml --yes    # apply it
+eval "$(1xops env)"                    # team/org: load your values into the shell
 ```
 
-- Keys are the `${VAR}` names each profile uses; `1ops profiles` lists them.
-- At `team` and `org` scope the shared files keep `${VAR}`, so profile names and tenant IDs never reach git. The host reads these from your shell environment, so run `1ops env`.
+- Keys are the `${VAR}` names each profile uses; `1xops profiles` lists them.
+- At `team` and `org` scope the shared files keep `${VAR}`, so profile names and tenant IDs never reach git. The host reads these from your shell environment, so run `1xops env`.
 - At `local` and `personal` scope the values are written into your private host configuration.
 - Values must be quoted strings, and keys that look like secrets (`TOKEN`, `SECRET`, `PASSWORD`, `API_KEY`) are refused.
 - Keep a personal `1ops.yaml` out of git.

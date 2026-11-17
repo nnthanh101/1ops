@@ -27,16 +27,16 @@
 | Channel | Command | What you get |
 |---|---|---|
 | git | `git clone --recurse-submodules https://github.com/nnthanh101/1ops` | The plugin, plus the upstream base plugins pinned in `upstream/` (`plugins/operations` links to it) |
-| PyPI | `uvx 1ops doctor` | The 1ops command line ([packages/python](packages/python/)) |
-| npm | `npx 1ops doctor` | The same command line, run through uv ([packages/npm](packages/npm/)) |
-| Container | `docker run --rm -v "$PWD:/work" ghcr.io/nnthanh101/1ops doctor` (or Docker Hub `nnthanh101/1ops`) | The same command line in a container |
+| PyPI | `uvx 1xops doctor` | The `1xops` command line ([packages/python](packages/python/)) |
+| npm | `npx 1xops doctor` | The same command line, run through uv ([packages/npm](packages/npm/)) |
+| Container | `docker run --rm -v "$PWD:/work" ghcr.io/nnthanh101/1xops doctor` (or Docker Hub `nnthanh101/1xops`) | The same command line in a container |
 
 The command line sets up the plugin, settings and read-only connectors for a whole organisation, a team or tenant folder, one project, or one person:
 
 ```bash
-1ops doctor                                              # prerequisites and read-only sign-in
-1ops install --yes                                       # marketplaces + plugin
-1ops config --scope team --connectors aws azure itsm     # shows a diff; add --yes to write
+1xops doctor                                              # prerequisites and read-only sign-in
+1xops install --yes                                       # marketplaces + plugin
+1xops config --scope team --connectors aws azure itsm     # shows a diff; add --yes to write
 ```
 
 Connector profiles (`aws`, `azure`, `itsm`) use only the vendors' own servers, pinned to exact versions, in read-only mode where the server offers one. Bring your own profile with `--connectors ./my-profile.json`.

@@ -1,13 +1,13 @@
 {
-  "name": "1ops",
+  "name": "1xops",
   "version": "0.2.0",
-  "description": "1ops by OceanSoft.io: runs the 1ops command line (doctor, install, config) through uv.",
+  "description": "1ops by OceanSoft.io: runs the 1xops command line (doctor, install, config) through uv.",
   "license": "Apache-2.0",
   "author": "Nhat-Thanh Nguyen <nnthanh101@gmail.com> (https://www.oceansoft.io)",
   "homepage": "https://www.oceansoft.io",
   "repository": { "type": "git", "url": "git+https://github.com/nnthanh101/1ops.git", "directory": "packages/npm" },
   "bugs": "https://github.com/nnthanh101/1ops/issues",
-  "bin": { "1ops": "bin/1ops.js" },
+  "bin": { "1xops": "bin/1xops.js" },
   "files": ["bin/", "README.md"],
   "engines": { "node": ">=24" }
 }

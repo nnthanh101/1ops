@@ -1,4 +1,4 @@
-"""`1ops setup`: a guided terminal setup that writes 1ops.yaml, then shows and applies the changes."""
+"""`1xops setup`: a guided terminal setup that writes 1ops.yaml, then shows and applies the changes."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def run(args: argparse.Namespace) -> int:
     from one_ops import cli  # imported here: cli imports this module
 
     path = Path(args.file)
-    console.print("[bold]1ops setup[/] — non-secret values only; secrets stay in your sign-in.\n")
+    console.print("[bold]1xops setup[/] — non-secret values only; secrets stay in your sign-in.\n")
     scope = Prompt.ask(
         "Scope (org: managed files for IT · team: shared project or tenant folder · "
         "local: you, this project · personal: you, every project)",
@@ -88,12 +88,12 @@ def run(args: argparse.Namespace) -> int:
     if not Confirm.ask(f"Write {path}?", default=True):
         return 1
     path.write_text(text)
-    cf.load(path)  # same checks as `1ops config --file`
+    cf.load(path)  # same checks as `1xops config --file`
 
     console.print("\nChanges this would make:")
     if cli.main(["config", "--file", str(path)]) != 0:
         return 2
     if Confirm.ask("Apply them now?", default=False):
         return cli.main(["config", "--file", str(path), "--yes"])
-    console.print(f"Apply later with: 1ops config --file {path} --yes")
+    console.print(f"Apply later with: 1xops config --file {path} --yes")
     return 0

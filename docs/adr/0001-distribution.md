@@ -13,7 +13,7 @@ End users should get 1ops with one command, whatever they already use. The free 
 |---|---|
 | Upstream base plugins | Git submodule `upstream/knowledge-work-plugins`, pinned to a commit; `plugins/operations` is a relative link into it. A monthly workflow opens a pull request that moves the pin. |
 | Plugin installs | Unchanged: the marketplace lists only `plugins/1ops`, which depends on the base plugin through its own marketplace. The link is for clones and local development. |
-| Command line | One implementation, Python, in `packages/python` (PyPI `1ops`, import `one_ops`). |
+| Command line | One implementation, Python, in `packages/python` (PyPI `1xops`, import `one_ops`, command `1xops`; PyPI refuses `1ops` as too similar to the existing `iops`). |
 | npm | `packages/npm` is a launcher that runs the same PyPI version through uv. No second implementation. |
 | Container | Built from `packages/python`; published to ghcr.io and mirrored to Docker Hub ([0002](0002-release-identity.md)). |
 | Layout | Language packages live under `packages/`, never at the root: the root is the plugin marketplace, and every marketplace install fetches it. |

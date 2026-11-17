@@ -1,5 +1,5 @@
 [project]
-name = "1ops"
+name = "1xops"
 version = "0.2.0"
 description = "1ops by OceanSoft.io: set up the 1ops plugin, settings and read-only cloud connectors for an organisation, team or person."
 readme = "README.md"
@@ -21,7 +21,7 @@ Repository = "https://github.com/nnthanh101/1ops"
 Issues = "https://github.com/nnthanh101/1ops/issues"
 
 [project.scripts]
-1ops = "one_ops.cli:main"
+1xops = "one_ops.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=9.2", "ruff>=0.17"]

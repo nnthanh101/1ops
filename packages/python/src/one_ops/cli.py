@@ -1,4 +1,4 @@
-"""1ops command line: doctor, install, config, profiles.
+"""1xops command line: doctor, install, config, profiles.
 
 Nothing is changed unless you pass --yes; without it each command shows what it would do.
 """
@@ -107,7 +107,7 @@ def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     rows = check_tools() + check_sign_in(args.aws_profile)
-    table = Table(title=f"1ops {__version__} doctor")
+    table = Table(title=f"1xops {__version__} doctor")
     for col in ("check", "needed", "result", "detail"):
         table.add_column(col)
     for name, required, ok, detail in rows:
@@ -128,7 +128,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def cmd_install(args: argparse.Namespace) -> int:
     if not shutil.which(s.HOST):
-        console.print(f"[red]'{s.HOST}' CLI not found; run '1ops doctor'.[/]")
+        console.print(f"[red]'{s.HOST}' CLI not found; run '1xops doctor'.[/]")
         return 1
     for step in INSTALL_STEPS:
         step = [*step, "--scope", args.scope]
@@ -233,7 +233,7 @@ def cmd_config(args: argparse.Namespace) -> int:
     if scope == "org":
         console.print(f"Give these files to IT to install in: {s.managed_dir()}")
     if not personal and any(values for _, values in profiles):
-        console.print('Shared files use ${VAR}. Load your values with: eval "$(1ops env)"')
+        console.print('Shared files use ${VAR}. Load your values with: eval "$(1xops env)"')
     return 0
 
 
@@ -271,8 +271,8 @@ def cmd_profiles(_: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="1ops", description="1ops by OceanSoft.io")
-    parser.add_argument("--version", action="version", version=f"1ops {__version__}")
+    parser = argparse.ArgumentParser(prog="1xops", description="1ops by OceanSoft.io")
+    parser.add_argument("--version", action="version", version=f"1xops {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("doctor", help="check prerequisites and read-only sign-in")
@@ -304,7 +304,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=[],
         metavar="PROFILE",
-        help="built-in profile names (see '1ops profiles') or .json files",
+        help="built-in profile names (see '1xops profiles') or .json files",
     )
     p.add_argument("--file", help="read scope, folder and connector values from 1ops.yaml")
     p.add_argument("--yes", action="store_true", help="write the changes (default: show a diff)")

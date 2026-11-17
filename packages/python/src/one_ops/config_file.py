@@ -9,7 +9,7 @@
       itsm: {}
       ./my-profile.json: {}          # your own profile file
 
-Keys under each connector are the ${VAR} names its servers use (see `1ops profiles`).
+Keys under each connector are the ${VAR} names its servers use (see `1xops profiles`).
 Secrets stay in SSO, `az login` or OAuth and never go in this file.
 """
 
