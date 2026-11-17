@@ -222,6 +222,12 @@ def cmd_config(args: argparse.Namespace) -> int:
     if not args.yes:
         console.print("Dry run. Re-run with --yes to write these changes.")
         return 0
+    if host_cmds and not shutil.which(s.HOST):
+        console.print(
+            f"[red]{scope} scope adds connectors through the '{s.HOST}' CLI, which is not installed. "
+            "Nothing was written. Install it, or use --scope team.[/]"
+        )
+        return 1
     for path, data in planned:
         _write(path, data)
         console.print(f"[green]wrote {path}[/]")

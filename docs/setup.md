@@ -22,6 +22,8 @@ git config core.hooksPath .githooks      # secret scan, commit message and quick
 # every push from a branch other than develop or main runs Validate locally with act first (.githooks/pre-push)
 ```
 
+Done means every acceptance criterion is proven on what the customer receives (the published package or the real asset), in a clean environment, with the command and its real output posted on the issue; only the maintainer closes it, and pull requests say `Refs #N`, never `Closes`.
+
 Rules: one capability per pull request, proven on a real asset (fixtures are for tests only); official vendor libraries only, and anything third-party needs the maintainer's approval and a line in [NOTICE](../NOTICE).
 
 Flow ([ADR 0003](adr/0003-git-standard.md)):
