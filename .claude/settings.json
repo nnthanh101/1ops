@@ -32,7 +32,21 @@
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./.secrets)"
+      "Read(./.secrets)",
+      "Bash(gh pr merge:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/git-guard.sh"
+          }
+        ]
+      }
     ]
   }
 }
