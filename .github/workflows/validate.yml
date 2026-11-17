@@ -1,30 +1,36 @@
 name: Validate
 
-# Builds everything, publishes nothing. GitHub runs it only for main (the develop → main pull
-# request and the merge) or by hand. Before that, develop and feature/* are checked locally:
-#   act pull_request -W .github/workflows/validate.yml
+# Builds and checks everything; publishes nothing. GitHub runs it for develop and main only.
+# Every other branch is checked locally by act before it is pushed (.githooks/pre-push).
 on:
   pull_request:
-    branches: [main]
+    branches: [develop, main]
   push:
-    branches: [main]
+    branches: [develop, main]
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  validate: # plugin + marketplace; job name kept for branch protection
+  plugin:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ !env.ACT }} # act: the runner image's own Node
         with:
           node-version: 26
-      - name: Strict validation (marketplace and plugin), pinned validator
+      - name: Strict validation with the pinned validator
         run: |
           npm install --no-save --prefix "$RUNNER_TEMP/v" @anthropic-ai/claude-code@2.1.325
           # npm 12 holds install scripts until approved: run this one pinned package's own script
@@ -32,16 +38,21 @@ jobs:
           v="$RUNNER_TEMP/v/node_modules/.bin/claude"
           "$v" plugin validate --strict .
           "$v" plugin validate --strict plugins/1xops
-      - name: Upstream symlink resolves
+      - name: Upstream link resolves
         run: test -f plugins/operations/.claude-plugin/plugin.json
 
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: packages/python
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - run: uv sync --locked --group dev
       - run: uv run ruff check src tests && uv run ruff format --check src tests
@@ -52,11 +63,16 @@ jobs:
 
   npm:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: packages/npm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ !env.ACT }} # act: the runner image's own Node
         with:
@@ -69,9 +85,14 @@ jobs:
       - run: npm pack --dry-run
 
   docker:
-    if: ${{ !github.event.act }} # act: no Docker CLI in the runner image; locally run docker build packages/python
+    if: ${{ !github.event.act }} # act: no Docker CLI in the runner image; pre-push builds the image instead
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: docker build -t 1xops:ci packages/python
       - run: docker run --rm 1xops:ci --version

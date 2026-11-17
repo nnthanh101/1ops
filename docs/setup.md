@@ -19,12 +19,19 @@ Scopes, the `1xops.yaml` format and the connector profiles are in the [command-l
 ```bash
 git clone --recurse-submodules https://github.com/nnthanh101/1xops && cd 1xops
 git config core.hooksPath .githooks      # secret scan, commit message and quick checks, as advice
-act pull_request -W .github/workflows/validate.yml   # the full CI, locally, before any pull request
+# every push from a branch other than develop or main runs Validate locally with act first (.githooks/pre-push)
 ```
 
 Rules: one capability per pull request, proven on a real asset (fixtures are for tests only); official vendor libraries only, and anything third-party needs the maintainer's approval and a line in [NOTICE](../NOTICE).
 
-Flow ([ADR 0003](adr/0003-git-standard.md)): `feature/*` is proven locally, then lands on `develop`; `develop` reaches `main` only by pull request; each release is a `v*` tag on `main`. GitHub Actions runs only for `main`, tags, the monthly schedule or by hand.
+Flow ([ADR 0003](adr/0003-git-standard.md)):
+
+1. A session works on its own `feature/*` branch, syncs `develop` into it and proves it locally (pre-push runs Validate with act).
+2. It lands the change on `develop` **staged, not committed** (`git merge --squash`), then deletes the feature branch locally and on GitHub.
+3. The maintainer reviews `git diff --staged`, commits and pushes `develop`. GitHub runs Validate.
+4. `develop` reaches `main` by a pull request the maintainer merges; each release is a `v*` tag on `main`.
+
+Sessions never commit, merge or push on `develop` or `main`, and never merge pull requests. GitHub Actions runs only for `develop`, `main`, tags, the monthly schedule or by hand.
 
 ## Release (maintainer, once)
 

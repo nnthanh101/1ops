@@ -1,44 +1,38 @@
 #!/usr/bin/env bash
-# pre-push: the quick local checks before anything reaches GitHub, as advice. It prints what failed and lets the push go
-# ahead: the person decides. The full set is the Validate workflow, run locally with act:
-#   act pull_request -W .github/workflows/validate.yml
+# pre-push: every branch except develop and main is proven locally before it reaches GitHub, because GitHub Actions
+# runs only for develop and main. It runs the Validate workflow with act, and builds the image act cannot build.
+# Advice only: it names what failed and how to rerun it, then lets the push go ahead. The person decides.
 # Turned on per clone by `git config core.hooksPath .githooks`. `bash .githooks/pre-push --self-test` proves it.
 set -uo pipefail
 unset GIT_DIR GIT_WORK_TREE
 
-main_advice() { # reads git's pre-push lines on stdin; names a push to main as advice; always returns 0
-  [ -t 0 ] && return 0
-  while read -r _ _ remote_ref _; do
-    [ "$remote_ref" = refs/heads/main ] && echo "pre-push: advice - main is protected: it takes a pull request from develop, tagged on main; the push goes ahead"
-  done; return 0
-}
-
-checks() { # ROOT: runs each quick check; prints one line per check; always returns 0
-  local root=$1 name cmd out
-  while IFS='|' read -r name cmd; do
-    if out=$(cd "$root" && bash -c "$cmd" 2>&1); then echo "  [pass] $name"
-    else echo "  [FAIL] $name"; printf '%s\n' "$out" | tail -4 | sed 's/^/    /'; fi
-  done <<'LIST'
-plugin|claude plugin validate --strict . >/dev/null && claude plugin validate --strict plugins/1xops >/dev/null
-python lint|cd packages/python && uv run --frozen ruff check src tests && uv run --frozen ruff format --check src tests
-python tests|cd packages/python && uv run --frozen pytest -q
-versions|test "$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)" = "$(node -p "require('./packages/npm/package.json').version")"
-LIST
-  return 0
+needs_local_ci() { # <branch>: 0 when the branch is checked locally (everything except develop and main)
+  case "$1" in develop|main|"") return 1 ;; *) return 0 ;; esac
 }
 
 if [ "${1:-}" = --self-test ]; then
   ok=0
-  o=$(printf 'refs/heads/develop 1 refs/heads/main 2\n' | main_advice)
-  printf '%s' "$o" | grep -q 'pull request from develop' && ok=$((ok + 1)) || echo "  [FAIL] a push to main was not named as advice"
-  o=$(printf 'refs/heads/develop 1 refs/heads/develop 2\n' | main_advice)
-  [ -z "$o" ] && ok=$((ok + 1)) || echo "  [FAIL] a push to develop was not silent"
-  t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
-  checks "$t" >/dev/null; [ $? = 0 ] && ok=$((ok + 1)) || echo "  [FAIL] a failed check held the push back"
+  needs_local_ci feature/x && ok=$((ok + 1)) || echo "  [FAIL] feature/x must be checked locally"
+  needs_local_ci develop || ok=$((ok + 1))
+  needs_local_ci main || ok=$((ok + 1))
+  [ "$ok" = 3 ] || echo "  [FAIL] develop and main are checked by GitHub, not by this hook"
   echo "pre-push self-test: $ok/3 cases as expected"; [ "$ok" = 3 ]; exit $?
 fi
 
-main_advice
-echo "pre-push: quick checks (advice; the push goes ahead)"
-checks "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-exit 0
+root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+needs_local_ci "$branch" || exit 0
+command -v act >/dev/null 2>&1 && docker info >/dev/null 2>&1 || {
+  echo "pre-push: advice - $branch was not checked locally: act and a running Docker are needed (brew install act; start Docker). The push goes ahead."; exit 0; }
+
+echo "pre-push: checking $branch locally (act: Validate, then the image)"
+log=$(mktemp); trap 'rm -f "$log"' EXIT
+if ! (cd "$root" && act pull_request -W .github/workflows/validate.yml --rm >"$log" 2>&1); then
+  grep -E "Job (succeeded|failed)|❌|::error" "$log" | tail -12
+  echo "pre-push: advice - Validate failed locally; the push goes ahead. Rerun: act pull_request -W .github/workflows/validate.yml"
+  exit 0
+fi
+grep -E "Job succeeded" "$log" | sort -u
+(cd "$root" && docker build -q -t 1xops:pre-push packages/python >/dev/null && docker run --rm 1xops:pre-push --version) || {
+  echo "pre-push: advice - the image did not build or run; the push goes ahead"; exit 0; }
+echo "pre-push: $branch passed locally"

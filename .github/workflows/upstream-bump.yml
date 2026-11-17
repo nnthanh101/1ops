@@ -7,13 +7,19 @@ on:
     - cron: "0 22 1 * *" # 1st of the month, 22:00 UTC (morning in NZ and eastern Australia)
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: upstream-bump
+  cancel-in-progress: false
 
 jobs:
   bump:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # pushes the feature/upstream-bump-* branch
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
