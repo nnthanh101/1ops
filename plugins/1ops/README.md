@@ -1,37 +1,36 @@
-# 1ops
+# 1ops plugin
 
-**1ops is an AI product of [OceanSoft.io](https://oceansoft.io).** Web: 1ops.oceansoft.io. Licensing and support: OceanSoft.io.
+1ops by [OceanSoft.io](https://www.oceansoft.io): cloud and AI cost checks, change requests and runbooks on real assets.
 
-An enterprise platform and operations add-on for Anthropic's free **operations** plugin. Anthropic's plugin gives the general playbooks: change request, runbook, risk, compliance, capacity, status, vendor review and process. This add-on adds only what enterprise platform teams need on top:
-- every connector checked before a playbook runs;
-- figures taken from the real asset, each with its source;
-- a person's yes before anything is written.
-
-## How it builds on Anthropic's plugin
-
-`plugin.json` declares `dependencies: ["operations@knowledge-work-plugins"]`, so installing this add-on also installs Anthropic's free plugin. Anthropic's commands stay `/operations:*`, and ours are `/1ops:*`. We never ship a plugin named `operations`: a same-name plugin replaces Anthropic's whole plugin, which we tested on 2026-11-16 and which matches the Claude Code docs on name conflicts.
+- Every figure carries its source.
+- Read-only by default.
+- Nothing is written, filed or changed without a person's yes.
 
 ## Install
 
 ```
-/plugin marketplace add anthropics/knowledge-work-plugins
-/plugin install operations@knowledge-work-plugins
-/plugin marketplace add 1xOps/1ops      # private: your GitHub account needs access
-/plugin install 1ops@1ops
+/plugin install 1ops --marketplace nnthanh101/1ops
 ```
 
-Tested against `anthropics/knowledge-work-plugins` at e91a134584eb (operations 1.3.0).
+## Commands
 
-## What it adds
-
-| Capability | Status | Serves |
+| Command | What it does | Status |
 |---|---|---|
-| Connector gate: `command-center check` before any playbook | Check shipped (#118); gate planned (#120) | Cloud engineer, SRE |
-| Change request from a real Terraform plan, every replace and destroy flagged from the plan file | Planned (OPS-002, #82) | Change manager, cloud engineer |
-| Status and compliance from live AWS, ServiceNow/JSM, Jira and GitHub, every figure with its source | Planned (OPS-003, OPS-005) | Platform & operations head, security analyst |
+| `/1ops:check` | Lists each connector as ready, signed out or missing, with the fix | Sprint 1 |
+| `/1ops:cost-check` | Top AWS (later Azure) savings with \$/month and source | Sprint 1–2 |
+| `/1ops:change-request` | CAB-ready change request from `terraform show -json` | Sprint 2 |
+| `/1ops:ai-spend` | AI spend by team, vendor and seat vs API | Sprint 3 |
+| `/1ops:runbook` | Executable runbook with per-step approval and evidence | Sprint 4 |
+| `/1ops:status` | Weekly status from a live project board | Sprint 5 |
 
-A capability ships only after it beats Anthropic's skill used alone, side by side, on a real asset.
+## Connectors
 
-Connectors in `.mcp.json` are vendor-official only: GitHub, Azure DevOps, Atlassian, Notion and Slack.
+Defined in [`.mcp.json`](.mcp.json): GitHub, Azure DevOps, Atlassian, Notion and Slack, each the vendor's official endpoint.
 
-Copyright (c) 2026 Nhat-Thanh Nguyen. All rights reserved. See [LICENSE](LICENSE). "Anthropic" and "Claude" are named only to identify the required plugin. This add-on is not made or endorsed by Anthropic.
+## Dependency
+
+`plugin.json` declares the free base `operations` plugin as its only dependency. 1ops commands are namespaced `/1ops:*` and never replace the base plugin's commands.
+
+## Licence
+
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). © 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io.

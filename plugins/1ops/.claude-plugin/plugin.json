@@ -1,22 +1,24 @@
 {
   "name": "1ops",
   "version": "0.1.0",
-  "description": "1ops: enterprise operations add-on for Claude, built on Anthropic's operations plugin. Connector-verified, evidence-cited, approval-gated playbooks on real assets.",
+  "description": "1ops by OceanSoft.io: cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced, read-only by default, nothing changed without a yes.",
   "author": {
     "name": "Nhat-Thanh Nguyen",
     "email": "nnthanh101@gmail.com",
-    "url": "https://github.com/1xOps"
+    "url": "https://www.oceansoft.io"
   },
-  "homepage": "https://github.com/1xOps/1ops",
-  "repository": "https://github.com/1xOps/1ops",
-  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://www.oceansoft.io",
+  "repository": "https://github.com/nnthanh101/1ops",
+  "license": "Apache-2.0",
   "keywords": [
-    "operations",
-    "enterprise",
+    "finops",
+    "cloudops",
+    "aws",
+    "azure",
+    "cost",
     "change-management",
-    "terraform",
-    "connectors",
-    "evidence"
+    "runbooks",
+    "terraform"
   ],
   "dependencies": [
     "operations@knowledge-work-plugins"
