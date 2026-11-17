@@ -1,14 +1,14 @@
 {
-  "name": "1ops",
+  "name": "1xops",
   "version": "0.1.0",
-  "description": "1ops by OceanSoft.io: cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced, read-only by default, nothing changed without a yes.",
+  "description": "1xops by OceanSoft.io: cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced, read-only by default, nothing changed without a yes.",
   "author": {
     "name": "Nhat-Thanh Nguyen",
     "email": "nnthanh101@gmail.com",
     "url": "https://www.oceansoft.io"
   },
   "homepage": "https://www.oceansoft.io",
-  "repository": "https://github.com/nnthanh101/1ops",
+  "repository": "https://github.com/nnthanh101/1xops",
   "license": "Apache-2.0",
   "keywords": [
     "finops",

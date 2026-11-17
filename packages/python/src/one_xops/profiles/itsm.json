@@ -1,0 +1,14 @@
+{
+  "description": "Atlassian Rovo MCP server (Cloud: Jira, Confluence); every call asks first",
+  "mcpServers": {
+    "atlassian": {
+      "type": "http",
+      "url": "https://mcp.atlassian.com/v2/mcp"
+    }
+  },
+  "permissions": {
+    "ask": [
+      "mcp__atlassian__*"
+    ]
+  }
+}

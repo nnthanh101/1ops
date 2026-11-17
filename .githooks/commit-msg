@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# commit-msg: checks the message and identity against the git standard, as advice. It names what differs and lets the
+# commit go ahead: the person decides (docs/adr/0026). The same file is used in every repository of the git standard.
+#   - a Conventional Commits header of at most 100 characters (release-please reads it)
+#   - author and committer are the owner (git config git-standard.owner, else nnthanh101@gmail.com)
+#   - no trailer line ending in "-by:": the owner is the only author
+# Turned on per clone by `git config core.hooksPath .githooks`. `bash .githooks/commit-msg --self-test` proves it.
+set -uo pipefail
+
+judge() { # <message file> <author email> <committer email>: prints advice lines; always returns 0
+  local f=$1 ae=$2 ce=$3 owner h
+  owner=${GIT_STANDARD_OWNER:-$(git config --get git-standard.owner 2>/dev/null || echo nnthanh101@gmail.com)}
+  h=$(grep -v '^#' "$f" | sed -n '1p')
+  case "$h" in Merge\ *|Revert\ *|fixup!\ *|squash!\ *|amend!\ *) ;; *)
+    printf '%s\n' "$h" | grep -Eq '^(feat|fix|docs|chore|refactor|test|ci|build|perf|revert|style|security)(\([[:alnum:]._/-]+\))?!?: [^ ]' \
+      || echo "commit-msg: advice - the header is not a Conventional Commit (type(scope): subject): $h"
+    [ "${#h}" -le 100 ] || echo "commit-msg: advice - the header has ${#h} characters; keep it to 100" ;;
+  esac
+  [ "$ae" = "$owner" ] || echo "commit-msg: advice - the author is $ae, not the owner $owner"
+  [ "$ce" = "$owner" ] || echo "commit-msg: advice - the committer is $ce, not the owner $owner"
+  grep -v '^#' "$f" | sed 1d | grep -Eiq '^[[:alpha:]-]+-by:' \
+    && echo "commit-msg: advice - the message carries a trailer line ending in -by:; the owner is the only author"
+  return 0
+}
+
+if [ "${1:-}" = --self-test ]; then
+  # Judged in memory only: nothing is committed. The one other identity is a reserved example address.
+  t=$(mktemp -d); trap 'rm -rf "$t"' EXIT; ok=0; o=nnthanh101@gmail.com; x=other@example.invalid
+  case_() { # <name> <expect: clean|<grep pattern>> <message> [author] [committer]
+    printf '%s\n' "$3" > "$t/m"; out=$(GIT_STANDARD_OWNER=$o judge "$t/m" "${4:-$o}" "${5:-$o}"); rc=$?
+    if [ "$rc" != 0 ]; then echo "  [FAIL] $1: the hook returned $rc; it must never hold a commit back"
+    elif [ "$2" = clean ]; then [ -z "$out" ] && ok=$((ok + 1)) || echo "  [FAIL] $1: expected no advice, got: $out"
+    else printf '%s' "$out" | grep -q "$2" && ok=$((ok + 1)) || echo "  [FAIL] $1: expected advice matching '$2'"; fi
+  }
+  case_ "a clean owner commit" clean "feat(git): one standard"
+  case_ "a body line that is not a trailer" clean "$(printf 'docs: owner review\n\nReviewed by the owner on the Mac.')"
+  case_ "a merge" clean "Merge branch 'develop'"
+  case_ "no type" "not a Conventional Commit" "updated stuff"
+  case_ "a long header" "keep it to 100" "fix: $(printf 'x%.0s' $(seq 1 100))"
+  case_ "a trailer line" "ending in -by:" "$(printf 'fix: a\n\nReviewed-by: %s' "$x")"
+  case_ "another author" "author is $x" "fix: a" "$x"
+  case_ "another committer" "committer is $x" "fix: a" "$o" "$x"
+  echo "commit-msg self-test: $ok/8 cases as expected"; [ "$ok" = 8 ]; exit $?
+fi
+
+ae=$(git var GIT_AUTHOR_IDENT 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p')
+ce=$(git var GIT_COMMITTER_IDENT 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p')
+judge "${1:?commit-msg: no message file}" "$ae" "$ce"
+exit 0
