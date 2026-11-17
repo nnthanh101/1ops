@@ -101,6 +101,20 @@ export function checkTools() {
   });
 }
 
+// Which 1xops plugin edition is installed, from the host's own plugin records. Read-only.
+export function checkEdition() {
+  const folder = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(homedir(), `.${s.HOST}`), 'plugins');
+  const read = (name) => { try { return JSON.parse(readFileSync(path.join(folder, name), 'utf8')); } catch { return {}; } };
+  const installed = read('installed_plugins.json').plugins ?? {};
+  const version = (key) => (installed[key]?.[0]?.version ?? '');
+  if ('1xops@1xops' in installed) {
+    if (read('known_marketplaces.json')['1xops']?.source?.repo === 'nnthanh101/1xops') return ['edition', false, false, 'free, old marketplace name: run 1xops install --yes'];
+    return ['edition', false, true, `enterprise ${version('1xops@1xops')}`.trim()];
+  }
+  if ('1xops@1ops' in installed) return ['edition', false, true, `free ${version('1xops@1ops')}`.trim()];
+  return ['edition', false, false, 'plugin not installed: 1xops install --yes'];
+}
+
 // Read-only sign-in checks. Account IDs are masked, never printed in full.
 export function checkSignIn(awsProfile) {
   const rows = [];
@@ -198,7 +212,7 @@ export function doctor(opts, version) {
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
-  const rows = [...checkTools(), ...checkSignIn(opts['aws-profile'])];
+  const rows = [...checkTools(), checkEdition(), ...checkSignIn(opts['aws-profile'])];
   const connectors = checkConnectors(opts.file);
   if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
@@ -223,24 +237,67 @@ export function doctor(opts, version) {
 
 // ── install ─────────────────────────────────────────────────────────────────
 
+// Installing an edition replaces the other (or the free edition under its old marketplace name, 1xops).
 const INSTALL_STEPS = [
   [s.HOST, 'plugin', 'marketplace', 'add', 'anthropics/knowledge-work-plugins'],
+  [s.HOST, 'plugin', 'uninstall', '1xops@1xops'],
+  [s.HOST, 'plugin', 'marketplace', 'remove', '1xops'],
   [s.HOST, 'plugin', 'marketplace', 'add', 'nnthanh101/1xops'],
   [s.HOST, 'plugin', 'install', '1xops@1ops'],
+]
+
+const SHOP = 'https://shop.oceansoft.io';
+
+// Free edition out, enterprise in: the same plugin name 1xops, from the unpacked bundle as marketplace 1xops.
+const enterpriseSteps = (folder) => [
+  [s.HOST, 'plugin', 'marketplace', 'add', 'anthropics/knowledge-work-plugins'],
+  [s.HOST, 'plugin', 'uninstall', '1xops@1ops'],
+  [s.HOST, 'plugin', 'marketplace', 'remove', '1xops'],
+  [s.HOST, 'plugin', 'marketplace', 'add', folder],
+  [s.HOST, 'plugin', 'install', '1xops@1xops'],
 ];
+
+// The enterprise bundle's version, read without unpacking (the system tar, so no dependency).
+export function bundleVersion(file) {
+  const member = (m) => { const r = run('tar', ['-xzOf', file, m]); if (r.code !== 0) throw new Error(); return JSON.parse(r.out); };
+  let market, plugin;
+  try { market = member('.claude-plugin/marketplace.json'); plugin = member('plugins/1xops/.claude-plugin/plugin.json'); }
+  catch { throw new Error(`${file} is not a 1xops enterprise bundle`); }
+  if (market.name !== '1xops' || plugin.name !== '1xops') throw new Error(`${file} is not a 1xops enterprise bundle`);
+  return String(plugin.version ?? '0');
+}
 
 export function install(opts) {
   if (!which(s.HOST)) {
     console.log(color('red', `'${s.HOST}' CLI not found; run '1xops doctor'.`));
     return 1;
   }
-  for (const base of INSTALL_STEPS) {
+  let steps = INSTALL_STEPS;
+  if (opts.edition === 'enterprise') {
+    if (!opts.file) {
+      console.log(`The enterprise edition is sold at ${SHOP}. Download the bundle from your order, then run:`);
+      console.log('  1xops install --edition enterprise --file <1xops-enterprise-x.y.z.tar.gz> --yes');
+      return 2;
+    }
+    let version;
+    try { version = bundleVersion(opts.file); } catch (err) { console.log(color('red', err.message)); return 2; }
+    const folder = path.join(homedir(), '.1xops', 'enterprise', version);
+    steps = enterpriseSteps(folder);
+    console.log(color('bold', `$ unpack ${opts.file} into ${folder}`));
+    if (opts.yes) {
+      mkdirSync(folder, { recursive: true });
+      const r = run('tar', ['-xzf', opts.file, '-C', folder]);
+      if (r.code !== 0) { console.log(r.out); return r.code; }
+    }
+  }
+  for (const base of steps) {
     const step = [...base, '--scope', opts.scope];
     console.log(color('bold', `$ ${step.join(' ')}`));
     if (!opts.yes) continue;
     const { code, out } = run(step[0], step.slice(1), 180000);
     console.log(out);
-    if (code !== 0) return code;
+    // removing the edition being replaced may fail harmlessly: it was not installed
+    if (code !== 0 && !step.includes('uninstall') && !step.includes('remove')) return code;
   }
   if (!opts.yes) console.log('Dry run. Re-run with --yes to install.');
   return 0;

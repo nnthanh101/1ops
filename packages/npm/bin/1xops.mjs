@@ -12,7 +12,8 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 const HELP = `Usage: 1xops <command> [options]
 
   doctor     check prerequisites, sign-in and connectors    [--aws-profile NAME] [--file PATH]
-  install    add the marketplaces and install the plugin    [--scope user|project|local] [--yes]
+  install    add the marketplaces and install the plugin    [--scope user|project|local] [--edition free|enterprise]
+                                                             [--file BUNDLE] [--yes]
   setup      guided setup: asks questions, writes ${DEFAULT_FILE}   [--file PATH]
   config     write settings and connectors for a scope      [--scope ${SCOPES.join('|')}] [--dir DIR]
                                                              [--out DIR] [--connectors NAME...] [--file PATH] [--yes]
@@ -34,7 +35,7 @@ if (!command || command === '--help' || command === '-h') {
 
 const OPTIONS = {
   doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE } },
-  install: { scope: { type: 'string', default: 'user' }, yes: { type: 'boolean', default: false } },
+  install: { scope: { type: 'string', default: 'user' }, edition: { type: 'string', default: 'free' }, file: { type: 'string' }, yes: { type: 'boolean', default: false } },
   setup: { file: { type: 'string', default: DEFAULT_FILE } },
   config: {
     scope: { type: 'string', default: 'team' },
@@ -67,6 +68,10 @@ try {
 }
 if (command === 'config' && !SCOPES.includes(opts.scope)) {
   console.error(`1xops config: --scope must be one of ${SCOPES.join(', ')}`);
+  process.exit(2);
+}
+if (command === 'install' && !['free', 'enterprise'].includes(opts.edition)) {
+  console.error('1xops install: --edition must be one of free, enterprise');
   process.exit(2);
 }
 if (command === 'install' && !['user', 'project', 'local'].includes(opts.scope)) {

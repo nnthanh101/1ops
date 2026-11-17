@@ -37,7 +37,7 @@ One namespace for free and enterprise: every command and skill is `/1xops:<name>
 | A skill is named for the rule it enforces | `/1xops:read-only-cloud` |
 | A shipped name never changes meaning | `check` is the same command in both editions |
 
-Free: marketplace `1ops` (this repository), `/plugin install 1xops@1ops`. Enterprise: marketplace `1xops` (private `1xOps/1xops-enterprise`), `/plugin install 1xops@1xops`: the same `1xops` plugin with every command above. Install one edition.
+Free: marketplace `1ops` (this repository), `1xops install --yes` or `/plugin install 1xops@1ops`. Enterprise: marketplace `1xops` (private `1xOps/1xops-enterprise`), bought at [shop.oceansoft.io](https://shop.oceansoft.io) and installed with `1xops install --edition enterprise --file <bundle> --yes`: the same `1xops` plugin with every command above. Installing one edition replaces the other.
 
 ## Connectors
 
