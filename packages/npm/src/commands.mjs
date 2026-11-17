@@ -30,6 +30,16 @@ export function run(cmd, args, timeout = 20000) {
 }
 
 export const mask = (account) => (account.length >= 4 ? `****${account.slice(-4)}` : '****');
+// Any 12-digit run (an AWS account ID) in any text, masked: doctor output is pasted onto issues as evidence.
+export const scrub = (text) => String(text).replace(/\d{12}/g, (d) => mask(d));
+// read: the role cannot change anything; write: it can; unknown: cannot tell from the name.
+export function accessFromRole(arn = '') {
+  const role = arn.match(/:assumed-role\/([^/]+)\//)?.[1] ?? arn.match(/:(user|root)\b/)?.[1] ?? '';
+  if (/readonly|viewonly|securityaudit|readaccess|viewer/i.test(role)) return 'read';
+  if (/admin|poweruser|fullaccess|root/i.test(role)) return 'write';
+  return 'unknown';
+}
+const ACCESS = { read: 'read-only', write: 'can change things: use a read-only role', unknown: 'access unknown: use a read-only role' };
 
 function table(title, columns, rows) {
   const width = columns.map((c, i) => Math.max(c.length, ...rows.map((r) => String(r[i]).length)));
@@ -58,9 +68,11 @@ export function checkSignIn(awsProfile) {
     const args = ['sts', 'get-caller-identity', '--output', 'json', ...(awsProfile ? ['--profile', awsProfile] : [])];
     const { code, out } = run('aws', args);
     if (code === 0) {
-      let account = '';
-      try { account = JSON.parse(out).Account ?? ''; } catch { /* not JSON */ }
-      rows.push(['aws sign-in', false, true, `signed in, account ${mask(account)}`]);
+      let id = {};
+      try { id = JSON.parse(out); } catch { /* not JSON */ }
+      const access = accessFromRole(id.Arn);
+      rows.push(['aws sign-in', false, true, `signed in, account ${mask(id.Account ?? '')}`]);
+      rows.push(['aws access', false, access === 'read', ACCESS[access]]);
     } else rows.push(['aws sign-in', false, false, 'not signed in (aws sso login)']);
   }
   if (which('az')) {
@@ -79,8 +91,8 @@ export function doctor(opts, version) {
   const shown = rows.map(([name, required, ok, detail]) => [
     name,
     required ? 'required' : 'optional',
-    ok ? color('green', 'ok') : required ? color('red', 'missing') : color('yellow', 'optional'),
-    detail,
+    ok ? color('green', 'ok') : required ? color('red', 'missing') : color('yellow', 'check'),
+    scrub(detail),
   ]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
   const failed = rows.filter((r) => r[1] && !r[2]).map((r) => r[0]);
@@ -150,7 +162,7 @@ function showChange(file, before, after) {
 function write(file, data) {
   mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;
-  writeFileSync(tmp, s.dumps(data));
+  writeFileSync(tmp, typeof data === 'string' ? data : s.dumps(data), { flush: true }); // on disk before the swap
   renameSync(tmp, file);
 }
 
@@ -320,7 +332,7 @@ export async function setup(opts) {
     console.log(`\n${file}\n${text}`);
     if (existsSync(file) && !(await yes(`${file} exists. Replace it?`, false))) return 1;
     if (!(await yes(`Write ${file}?`, true))) return 1;
-    writeFileSync(file, text);
+    write(file, text);
     cf.load(file); // same checks as `1xops config --file`
 
     console.log('\nChanges this would make:');

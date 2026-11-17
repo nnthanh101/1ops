@@ -19,7 +19,7 @@ Scopes, the `.env.1xops` format and the connector profiles are in the [command-l
 ```bash
 git clone --recurse-submodules https://github.com/nnthanh101/1xops && cd 1xops
 git config core.hooksPath .githooks      # secret scan, commit message and quick checks, as advice
-# every push from a branch other than develop or main runs Validate locally with act first (.githooks/pre-push)
+# every push from a branch other than develop or main runs the tests locally with act first (.githooks/pre-push)
 ```
 
 Done means every acceptance criterion is proven on what the customer receives (the published package or the real asset), in a clean environment, with the command and its real output posted on the issue; only the maintainer closes it, and pull requests say `Refs #N`, never `Closes`.
@@ -28,9 +28,9 @@ Rules: one capability per pull request, proven on a real asset (fixtures are for
 
 Flow ([ADR 0003](adr/0003-git-standard.md)):
 
-1. A session works on its own `feature/*` branch, syncs `develop` into it and proves it locally (pre-push runs Validate with act).
+1. A session works on its own `feature/*` branch, syncs `develop` into it and proves it locally (pre-push runs the tests with act).
 2. It lands the change on `develop` **staged, not committed** (`git merge --squash`), then deletes the feature branch locally and on GitHub.
-3. The maintainer reviews `git diff --staged`, commits and pushes `develop`. GitHub runs Validate.
+3. The maintainer reviews `git diff --staged`, commits and pushes `develop`. GitHub runs the tests (the Release workflow; it publishes only from a `v*` tag).
 4. `develop` reaches `main` by a pull request the maintainer merges; each release is a `v*` tag on `main`.
 
 Sessions never commit, merge or push on `develop` or `main`, and never merge pull requests. GitHub Actions runs only for `develop`, `main`, tags, the monthly schedule or by hand.
@@ -66,8 +66,7 @@ gh api -X POST repos/nnthanh101/1xops/rulesets --input .github/rulesets/main.jso
 
 ## Release a version
 
-1. Bump the same version in `packages/python/pyproject.toml` and `packages/npm/package.json` on a `feature/*` branch; land on `develop`.
-2. Open the pull request `develop` → `main`; CI runs; merge.
-3. Tag on `main`: `git tag v0.2.0 && git push origin v0.2.0`.
-4. Approve the `release` environment once: PyPI, npm and the images publish in parallel.
-5. Check: `uvx 1xops@0.2.0 --version`, `npx 1xops@0.2.0 --version`, `docker run --rm ghcr.io/nnthanh101/1xops:0.2.0 --version`.
+1. Set the version on `develop` and push it. If you skip this, `task release` stops and prints the one line to run.
+2. `task release VERSION=x.y.z STORY=n`, then approve the `release` environment once, at the link it prints. It merges `develop` into `main` once the checks pass, tags it, waits for PyPI, npm and the images, installs the release from every channel in clean containers and posts that proof on story `n`.
+
+`task status` shows what customers can install today and each story's proof.

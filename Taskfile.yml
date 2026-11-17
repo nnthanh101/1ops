@@ -1,0 +1,56 @@
+# Taskfile.yml - type `task` to see this list.
+#
+#   Customer
+#     task doctor                          am I ready? tools, sign-in, read-only access (account IDs masked)
+#     task setup                           guided setup; shows every change before it is made
+#     task config [YES=1]                  apply my settings (a preview unless YES=1)
+#   Owner and leadership
+#     task status                          what customers can install today, each story's proof, product health
+#     task release [VERSION=x.y.z] STORY=n ship the next version and prove it: tested here first, one approval click
+#   Engineer
+#     task test                            quick tests
+#     task ci                              the full check, as it runs on GitHub
+version: '3'
+
+vars:
+  PY: uv run --project packages/python 1xops
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  doctor:
+    desc: 'Am I ready? Tools, sign-in, read-only access (account IDs masked)'
+    cmds: ['{{.PY}} doctor']
+
+  setup:
+    desc: 'Guided setup: writes .env.1xops and shows every change before it is made'
+    interactive: true
+    cmds: ['{{.PY}} setup']
+
+  config:
+    desc: Apply my settings; a preview unless YES=1
+    cmds: ['{{.PY}} config --file .env.1xops {{if .YES}}--yes{{end}}']
+    preconditions:
+      - sh: test -f .env.1xops
+        msg: 'No .env.1xops here: run task setup first'
+
+  status:
+    desc: What customers can install today, each story's proof, product health
+    cmds: [bash scripts/status.sh]
+
+  release:
+    desc: 'Owner only: ship the next version (or VERSION), tested here first; proof posted on STORY'
+    interactive: true
+    cmds: ['VERSION={{.VERSION}} STORY={{.STORY}} bash scripts/release.sh']
+
+  test:
+    desc: Quick tests
+    cmds:
+      - uv run --project packages/python --group dev pytest -q packages/python/tests
+      - npm test --prefix packages/npm --silent
+
+  ci:
+    desc: The full check, as it runs on GitHub
+    cmds: [act pull_request -W .github/workflows/release.yml --rm]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 from importlib import resources
 from pathlib import Path
@@ -117,3 +118,14 @@ def read_json(path: Path) -> dict:
 
 def dumps(data: dict) -> str:
     return json.dumps(data, indent=2) + "\n"
+
+
+def write(path: Path, text: str) -> None:
+    """Write through a temp file, flushed to disk, then swap it in: never a half-written file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    tmp.replace(path)

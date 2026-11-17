@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cf from '../src/config-file.mjs';
 import * as s from '../src/settings.mjs';
-import { mask } from '../src/commands.mjs';
+import { accessFromRole, mask, scrub } from '../src/commands.mjs';
 
 const BIN = fileURLToPath(new URL('../bin/1xops.mjs', import.meta.url));
 const tmp = () => mkdtempSync(path.join(os.tmpdir(), '1xops-'));
@@ -136,4 +136,19 @@ test('local scope without the host CLI writes nothing', () => {
   const r = cli(['config', '--scope', 'local', '--dir', project, '--connectors', 'aws', '--yes'], { PATH: path.dirname(process.execPath) });
   assert.equal(r.status, 1);
   assert.ok(!existsSync(path.join(project, '.claude')));
+});
+
+test('scrub masks every 12-digit account ID in any text', () => {
+  assert.equal(scrub('arn:aws:sts::123456789012:assumed-role/Admin-123456789012/x'), 'arn:aws:sts::****9012:assumed-role/Admin-****9012/x');
+  assert.equal(scrub('aws-cli/2.31.0'), 'aws-cli/2.31.0');
+});
+
+test('accessFromRole tells read-only from roles that can change things', () => {
+  const arn = (role) => `arn:aws:sts::123456789012:assumed-role/${role}/me`;
+  assert.equal(accessFromRole(arn('AWSReservedSSO_ReadOnlyAccess_abc')), 'read');
+  assert.equal(accessFromRole(arn('SecurityAudit')), 'read');
+  assert.equal(accessFromRole(arn('AWSReservedSSO_AdministratorAccess_abc')), 'write');
+  assert.equal(accessFromRole('arn:aws:iam::123456789012:root'), 'write');
+  assert.equal(accessFromRole(arn('ops')), 'unknown');
+  assert.equal(accessFromRole(undefined), 'unknown');
 });
