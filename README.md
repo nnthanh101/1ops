@@ -1,4 +1,4 @@
-# 1xops
+# 1xops 🧰 Cloud & AI Operations ⚙️
 
 **Reduce cloud and AI costs. Automate operational work. Keep your team in control.**
 
