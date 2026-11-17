@@ -1,0 +1,38 @@
+# tests/Taskfile.yml - see 1xops as a first-time customer does, before a release. Included as `task ux`.
+#   task ux     build this tree, install it the customer's way in clean containers (non-root, no cloud account),
+#               drive every command in a real terminal, check what tests cannot see, write tmp/ux/report.md and
+#               one screenshot per run. `task release` runs it before anything is pushed.
+version: '3'
+
+vars:
+  # One image pair per folder: runs from two folders (or sessions) never test each other's build.
+  TAG:
+    sh: pwd | cksum | cut -d' ' -f1
+
+tasks:
+  default:
+    desc: 'UX proof: every 1xops command in a real terminal, checked, with screenshots (tmp/ux)'
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - rm -rf tmp/ux && mkdir -p tmp/ux/pkg
+      - uv build -q --project packages/python --out-dir tmp/ux/pkg
+      - cd packages/npm && npm pack --silent --pack-destination ../../tmp/ux/pkg >/dev/null && rm -rf profiles
+      - |
+        docker build -q -t 1xops-ux:py-{{.TAG}} -f - tmp/ux/pkg >/dev/null <<'EOF'
+        FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+        COPY *.whl /pkg/
+        RUN UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin uv tool install -q /pkg/*.whl && install -d -o 1000 -g 1000 /work
+        USER 1000:1000
+        ENV HOME=/tmp/home
+        WORKDIR /work
+        EOF
+      - |
+        docker build -q -t 1xops-ux:js-{{.TAG}} -f - tmp/ux/pkg >/dev/null <<'EOF'
+        FROM node:24-slim
+        COPY *.tgz /pkg/
+        RUN npm install -g --silent /pkg/*.tgz && install -d -o 1000 -g 1000 /work
+        USER 1000:1000
+        ENV HOME=/tmp/home
+        WORKDIR /work
+        EOF
+      - UX_TAG={{.TAG}} uv run -q --project packages/python python scripts/ux_proof.py tmp/ux

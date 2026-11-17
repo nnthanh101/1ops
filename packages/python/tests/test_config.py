@@ -231,3 +231,4 @@ def test_doctor_without_settings_file_says_run_setup(tmp_path: Path):
     assert cli.check_connectors(str(tmp_path / ".env.1xops")) == [
         ("connectors", "missing", f"no {tmp_path / '.env.1xops'} here: run 1xops setup")
     ]
+

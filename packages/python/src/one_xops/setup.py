@@ -12,11 +12,17 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
+from rich.table import Table
+from rich.text import Text
 
 from one_xops import config_file as cf
 from one_xops import settings as s
 
 console = Console()
+if (
+    not console.is_terminal
+):  # piped (the assistant, evidence): size to content, never wrap like a terminal
+    console = Console(width=400)
 
 
 def _out(cmd: list[str]) -> str:
@@ -83,26 +89,77 @@ def read_only_profiles() -> list[tuple[str, str, str]]:
     return sorted(found, key=lambda x: (x[1], x[0]))
 
 
+SCOPE_HELP = {
+    "org": "managed files for IT, every person in the organisation",
+    "team": "a shared project or tenant folder",
+    "local": "you, in this project only",
+    "personal": "you, in every project",
+}
+_shown: set[str] = set()  # "list" or "none": said once per run, not once per variable
+
+
+def _profile_table(rows: list[tuple[int, tuple[str, str, str]]], title: str) -> Table:
+    table = Table(title=title, title_style="bold")
+    for col, justify in (
+        ("#", "right"),
+        ("profile", "left"),
+        ("account", "left"),
+        ("role", "left"),
+    ):
+        table.add_column(col, justify=justify)
+    for n, (name, acct, role) in rows:
+        table.add_row(str(n), name, acct, role)
+    return table
+
+
 def ask_profile(var: str) -> str:
-    """Pick a read-only AWS profile by number. No typing: a mistyped or admin profile cannot get in."""
+    """Pick a read-only AWS profile: by number, or type part of a name to filter. A typed name that is not in
+    the read-only list cannot get in. The list is shown once; later questions refer to it."""
     options = read_only_profiles()
     if not options:
-        console.print(
-            f"  {var}: no read-only AWS profile found in ~/.aws/config. Create one (an SSO role such as ReadOnlyAccess) "
-            "with: aws configure sso. This connector will show as missing in /1xops:check until then."
-        )
+        if "none" not in _shown:
+            console.print("  No read-only AWS profile in ~/.aws/config yet.", highlight=False)
+            console.print(
+                "  Create one with: aws configure sso (a role such as ReadOnlyAccess).",
+                highlight=False,
+            )
+            console.print(
+                "  Until then /1xops:check shows this connector as missing.", highlight=False
+            )
+            _shown.add("none")
         return ""
-    console.print(f"  {var}: read-only profiles only")
-    for i, (name, acct, role) in enumerate(options, 1):
-        console.print(f"    {i}) {name}  {acct}  {role}", markup=False, highlight=False)
-    pick = Prompt.ask(
-        "  Number (Enter to skip)",
-        choices=[str(i) for i in range(1, len(options) + 1)] + [""],
-        default="",
-        show_default=False,
-        show_choices=False,
-    )
-    return options[int(pick) - 1][0] if pick else ""
+    numbered = list(enumerate(options, 1))
+    if "list" not in _shown:
+        console.print(_profile_table(numbered, f"Read-only AWS profiles ({len(options)})"))
+        _shown.add("list")
+    current = os.environ.get(var, "")
+    default = next((str(n) for n, (name, _, _) in numbered if name == current), "")
+    hint = f"Enter keeps {default}, - skips" if default else "Enter skips"
+    while True:
+        pick = Prompt.ask(
+            f"  {var}: number or part of a name ({hint})", default=default, show_default=False
+        )
+        pick = pick.strip()
+        if not pick or pick == "-":
+            return ""
+        if pick.isdigit():
+            if 1 <= int(pick) <= len(options):
+                return options[int(pick) - 1][0]
+            console.print(f"  No profile number {pick}: pick 1 to {len(options)}.", highlight=False)
+            continue
+        matches = [
+            (n, o)
+            for n, o in numbered
+            if pick.lower() in o[0].lower() or pick.lower() in o[2].lower()
+        ]
+        if len(matches) == 1:
+            return matches[0][1][0]
+        if matches:
+            console.print(_profile_table(matches, f"Matching '{pick}' ({len(matches)})"))
+        else:
+            console.print(
+                f"  No read-only profile matches '{pick}'.", markup=False, highlight=False
+            )
 
 
 def ask_value(var: str, found: dict) -> str:
@@ -116,13 +173,15 @@ def run(args: argparse.Namespace) -> int:
     from one_xops import cli  # imported here: cli imports this module
 
     path = Path(args.file)
+    _shown.clear()
     console.print("[bold]1xops setup[/] — non-secret values only; secrets stay in your sign-in.\n")
-    scope = Prompt.ask(
-        "Scope (org: managed files for IT · team: shared project or tenant folder · "
-        "local: you, this project · personal: you, every project)",
-        choices=list(s.SCOPES),
-        default="team",
-    )
+    scopes = Table(title="Who the settings are for", title_style="bold")
+    scopes.add_column("scope")
+    scopes.add_column("for")
+    for name in s.SCOPES:
+        scopes.add_row(name, SCOPE_HELP[name])
+    console.print(scopes)
+    scope = Prompt.ask("Scope", choices=list(s.SCOPES), default="team")
     config: dict = {"scope": scope}
     if scope in ("team", "local"):
         config["dir"] = Prompt.ask("Project or tenant folder", default=".")
@@ -143,7 +202,9 @@ def run(args: argparse.Namespace) -> int:
     config["connectors"] = connectors
 
     text = cf.dump(config)
-    console.print(f"\n[bold]{path}[/]\n{text}", markup=False, highlight=False)
+    console.print()
+    console.print(Text(str(path), style="bold"))
+    console.print(text, markup=False, highlight=False, soft_wrap=True)
     if path.exists() and not Confirm.ask(f"{path} exists. Replace it?", default=False):
         return 1
     if not Confirm.ask(f"Write {path}?", default=True):
@@ -152,8 +213,10 @@ def run(args: argparse.Namespace) -> int:
     cf.load(path)  # same checks as `1xops config --file`
 
     console.print("\nChanges this would make:")
-    if cli.main(["config", "--file", str(path)]) != 0:
+    if cli.main(["config", "--file", str(path), "--preview", "summary"]) != 0:
         return 2
+    if Confirm.ask("Show every line first?", default=False):
+        cli.main(["config", "--file", str(path), "--preview", "full"])
     if Confirm.ask("Apply them now?", default=False):
         return cli.main(["config", "--file", str(path), "--yes"])
     console.print(f"Apply later with: 1xops config --file {path} --yes")

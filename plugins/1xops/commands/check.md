@@ -3,12 +3,13 @@ description: Show each configured connector as ready, signed out or missing, wit
 allowed-tools: Bash(1xops doctor:*), Bash(command -v 1xops)
 ---
 
-Run `1xops doctor` in the current folder and show its output exactly as printed, as a code block. Do not run anything else, sign in, or change any file.
+Run `1xops doctor` in the current folder. Reply with its output exactly as printed, inside one code block, and nothing else: no heading, no list, no summary. Its last lines already say what to do next.
 
-If `1xops` is not installed (`command -v 1xops` prints nothing), say so and show the install line instead:
+If `1xops` is not installed (`command -v 1xops` prints nothing), reply with only this:
 
-```bash
-uv tool install 1xops        # or: npm install -g 1xops
+```
+1xops is not installed. Install it, then run /1xops:check again:
+  uv tool install 1xops        (or: npm install -g 1xops)
 ```
 
-After the output, list only the rows whose result is not `ok` or `ready`, each with the fix from its detail column, in the order shown. Add nothing that the output does not say.
+Do not run anything else, sign in, or change any file.
