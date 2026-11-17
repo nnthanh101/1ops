@@ -1,11 +1,14 @@
 name: Validate
 
-# Runs on every PR and on develop/main. Builds everything, publishes nothing.
-# Locally, without Actions minutes: act pull_request -W .github/workflows/validate.yml
+# Builds everything, publishes nothing. GitHub runs it only for main (the develop → main pull
+# request and the merge) or by hand. Before that, develop and feature/* are checked locally:
+#   act pull_request -W .github/workflows/validate.yml
 on:
   pull_request:
+    branches: [main]
   push:
-    branches: [develop, main]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,10 +21,17 @@ jobs:
         with:
           submodules: true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !env.ACT }} # act: the runner image's own Node
         with:
           node-version: 26
-      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict .
-      - run: npx -y @anthropic-ai/claude-code@2.1.325 plugin validate --strict plugins/1ops
+      - name: Strict validation (marketplace and plugin), pinned validator
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/v" @anthropic-ai/claude-code@2.1.325
+          # npm 12 holds install scripts until approved: run this one pinned package's own script
+          node "$RUNNER_TEMP/v/node_modules/@anthropic-ai/claude-code/install.cjs"
+          v="$RUNNER_TEMP/v/node_modules/.bin/claude"
+          "$v" plugin validate --strict .
+          "$v" plugin validate --strict plugins/1ops
       - name: Upstream symlink resolves
         run: test -f plugins/operations/.claude-plugin/plugin.json
 
@@ -48,6 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !env.ACT }} # act: the runner image's own Node
         with:
           node-version: 26
       - name: Versions match
@@ -58,6 +69,7 @@ jobs:
       - run: npm pack --dry-run
 
   docker:
+    if: ${{ !github.event.act }} # act: no Docker CLI in the runner image; locally run docker build packages/python
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
