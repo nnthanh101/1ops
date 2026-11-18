@@ -16,7 +16,8 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
 - Git: work on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
   switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
-  delete the branch and the worktree. The session commits and releases: `task release STORY=n [BUMP=…]` end to end, then
+  delete the branch and the worktree. The session commits and releases, but first asks the owner one question with
+  scored options, each with its business value (version, now or hold); on yes it runs `task release STORY=n` end to end, then
   proves the published package. The owner's only step is one click on the protected `release` environment, which the
   session opens in the owner's browser. A session never approves a deployment itself and never force-pushes.
 - Guard rails advise or ask; they never block the owner.
@@ -29,9 +30,10 @@ vendor or version; a shipped name never changes meaning. Free (this repository):
 `1xops` plugin in the private `1xOps/1xops-enterprise` repository. Marketplaces: free `1ops` (`1xops@1ops`), enterprise `1xops` (`1xops@1xops`). Table: `plugins/1xops/README.md`.
 
 ## Release standard
-SemVer, tag `vX.Y.Z`, one version for PyPI, npm and the image. Next version = latest published + 1:
-`task release STORY=n` is a patch (fixes, UX); `BUMP=minor` adds a command or capability; `BUMP=major` breaks a
-command, file or setting. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`) and say `Refs #N`.
+SemVer, tag `vX.Y.Z`, one version for PyPI, npm and the image. Next version = latest published + 1 patch:
+`task release STORY=n` is the default, for fixes, UX and added commands that break nothing. `BUMP=minor` or `BUMP=major`
+only when the owner picks it in the release question; never inflate the version. A command that is renamed keeps its old
+name working, deprecated, so it is still a patch. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`) and say `Refs #N`.
 
 ## Definition of done
 A criterion is done only when it is proven end to end as a customer: the published package, installed and operated
@@ -85,3 +87,4 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | The plugin version was never bumped by the release, and Claude Code updates an installed plugin only when it changes, so a fix on `develop` never reached existing installs | The plugin version is the release version: `release.sh` sets it and the Release check compares it with PyPI and npm |
 | A session ended its answer with "for you to close", then with a list of next steps | See "Finish a story yourself": prove, tick, move to Approval, ask one question, close on yes |
 | A story waited on the owner for steps the session could do itself (a read-only proof profile, a sign-in prompt, ticking proven boxes) | Do every real, read-only step yourself; stop only for an approval, a credential only the owner can create, or a cloud write |
+| A release was bumped to 0.4.0 because a command was added; the owner wanted 0.3.2, and the tag had to be removed after the merge | A patch by default; the version is one of the scored options in the release question, asked before the release starts |
