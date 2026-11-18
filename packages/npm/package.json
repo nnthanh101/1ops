@@ -9,10 +9,10 @@
   "bugs": "https://github.com/nnthanh101/1xops/issues",
   "type": "module",
   "bin": { "1xops": "bin/1xops.mjs" },
-  "files": ["bin", "src", "profiles", "templates", "README.md"],
+  "files": ["bin", "src", "profiles", "templates", "README.md", "LICENSE", "NOTICE"],
   "engines": { "node": ">=24" },
   "scripts": {
     "test": "node --test --test-reporter=spec",
-    "prepack": "rm -rf profiles && mkdir profiles && cp ../python/src/one_xops/profiles/*.json profiles/ && bash ../../scripts/sync-templates.sh"
+    "prepack": "rm -rf profiles templates && mkdir profiles templates && cp ../python/src/one_xops/profiles/*.json profiles/ && cp -R ../../templates/settings templates/ && cp ../../LICENSE ../../NOTICE ."
   }
 }

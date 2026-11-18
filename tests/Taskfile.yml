@@ -46,8 +46,7 @@ tasks:
       Scenario: a first Dockerfile written from scratch was 386 MB, unpinned and unlocked; this build is measured every time.
     dir: '{{.ROOT_DIR}}'
     cmds:
-      - bash scripts/sync-templates.sh
-      - docker build -q -t 1xops:gate-{{.TAG}} packages/python >/dev/null
+      - docker build -q --build-context repo=. -t 1xops:gate-{{.TAG}} packages/python >/dev/null
       - test "$(docker run --rm 1xops:gate-{{.TAG}} --version)" = "1xops $(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)"
 
   ux:
@@ -58,9 +57,8 @@ tasks:
     dir: '{{.ROOT_DIR}}'
     cmds:
       - rm -rf tmp/ux && mkdir -p tmp/ux/pkg
-      - bash scripts/sync-templates.sh
       - uv build -q --project packages/python --out-dir tmp/ux/pkg
-      - cd packages/npm && npm pack --silent --pack-destination ../../tmp/ux/pkg >/dev/null && rm -rf profiles
+      - cd packages/npm && npm pack --silent --pack-destination ../../tmp/ux/pkg >/dev/null && rm -rf profiles LICENSE NOTICE
       - |
         docker build -q -t 1xops-ux:py-{{.TAG}} -f - tmp/ux/pkg >/dev/null <<'EOF'
         FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
