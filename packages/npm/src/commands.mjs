@@ -649,6 +649,21 @@ const SCOPE_HELP = {
   personal: 'you, in every project',
 };
 
+// The starter note of a tenant's docs folder: front matter that follows the wiki's contract, so the folder can be
+// opened in Obsidian and rendered by Docusaurus as it is.
+const slug = (name) => {
+  const s = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
+  return /^[a-z][a-z0-9-]{1,62}$/.test(s) ? s : `tenant-${s}`.slice(0, 63);
+};
+const tenantNote = (name, connectors) => `---\nid: ${slug(name)}\ntitle: ${name}\ntype: entity\nstatus: emerging\n`
+  + `last_updated: ${new Date().toLocaleDateString('en-CA')}\nsources: []\ntags: [tenant]\n---\n\n# ${name}\n\n`
+  + 'What this tenant runs, who owns it, and where its runbooks are.\n\n'
+  + '- Owner: (add a name or team)\n'
+  + `- Connectors: ${connectors.join(', ') || '(none yet)'}\n`
+  + '- Runbooks go in `runbooks/` (type: runbook), postmortems in `reviews/` (type: review), '
+  + 'services and systems in `entities/` (type: entity), decisions in `decisions/` (type: decision).\n\n'
+  + 'Notes may name things: profiles, accounts masked as ****1234. They never hold keys, tokens or passwords.\n';
+
 export async function setup(opts) {
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
   const lines = rl[Symbol.asyncIterator]();
@@ -792,6 +807,13 @@ export async function setup(opts) {
     if (!(await yes(`Write ${file}?`, true))) return 1;
     write(file, text);
     cf.load(file); // same checks as `1xops config --file`
+    if (scope === 'team' || scope === 'local') {
+      const note = join(path.dirname(file), 'docs', 'tenant.md');
+      if (!existsSync(note)) {
+        write(note, tenantNote(path.basename(path.resolve(path.dirname(file))), Object.keys(connectors)));
+        console.log(`Wrote ${note}: this tenant's notes. Open the docs folder in Obsidian.`);
+      }
+    }
 
     console.log('\nChanges this would make:');
     if (config({ file, preview: 'summary' }) !== 0) return 2;

@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+from datetime import date
 from pathlib import Path
 
 from rich.console import Console
@@ -320,6 +321,26 @@ def connect(connectors: dict[str, dict[str, str]]) -> None:
     )
 
 
+def _slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:63]
+    return slug if re.fullmatch(r"[a-z][a-z0-9-]{1,62}", slug) else f"tenant-{slug}"[:63]
+
+
+def tenant_note(name: str, connectors: list[str]) -> str:
+    """The starter note of a tenant's docs folder: front matter that follows the wiki's contract, so the folder can
+    be opened in Obsidian and rendered by Docusaurus as it is."""
+    return (
+        f"---\nid: {_slug(name)}\ntitle: {name}\ntype: entity\nstatus: emerging\n"
+        f"last_updated: {date.today().isoformat()}\nsources: []\ntags: [tenant]\n---\n\n# {name}\n\n"
+        "What this tenant runs, who owns it, and where its runbooks are.\n\n"
+        "- Owner: (add a name or team)\n"
+        f"- Connectors: {', '.join(connectors) or '(none yet)'}\n"
+        "- Runbooks go in `runbooks/` (type: runbook), postmortems in `reviews/` (type: review), "
+        "services and systems in `entities/` (type: entity), decisions in `decisions/` (type: decision).\n\n"
+        "Notes may name things: profiles, accounts masked as ****1234. They never hold keys, tokens or passwords.\n"
+    )
+
+
 def _home(p: str) -> str:
     """A path with the home folder written as ~, so the file works on another machine."""
     home = str(Path.home())
@@ -422,6 +443,15 @@ def run(args: argparse.Namespace) -> int:
         return 1
     s.write(path, text)
     cf.load(path)  # same checks as `1xops config --file`
+    if scope in ("team", "local"):
+        note = path.parent / "docs" / "tenant.md"
+        if not note.exists():
+            s.write(note, tenant_note(path.parent.resolve().name, list(connectors)))
+            console.print(
+                f"Wrote {note}: this tenant's notes. Open the docs folder in Obsidian.",
+                markup=False,
+                highlight=False,
+            )
 
     console.print("\nChanges this would make:")
     if cli.main(["config", "--file", str(path), "--preview", "summary"]) != 0:
