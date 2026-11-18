@@ -1,11 +1,17 @@
 # 1xops tasks. Type `task`: it shows what needs attention now, then this list. `task --summary <name>` gives the business value and a real scenario.
+# Customer tasks run the released 1xops (from PyPI, through uv). Developers run this folder's source instead: task DEV=1 <task>
 #   👤 Customer   tasks/customer.yml   doctor · setup · config
 #   🔑 Owner      tasks/owner.yml      status · release
 #   🔧 Engineer   tests/Taskfile.yml   test · lint · image · ux · ci · gate
 version: '3'
 
 includes:
-  customer: {taskfile: ./tasks/customer.yml, dir: ., flatten: true}
+  customer:
+    taskfile: ./tasks/customer.yml
+    dir: .
+    flatten: true
+    vars:
+      PY: '{{if .DEV}}uv run --project packages/python 1xops{{else}}uvx 1xops@latest{{end}}'
   owner:    {taskfile: ./tasks/owner.yml, dir: ., flatten: true}
   tests:    {taskfile: ./tests/Taskfile.yml, flatten: true}
 
@@ -14,11 +20,16 @@ tasks:
   # Scenario: at 2 a.m. the on-call engineer's AWS connector is signed out; `task` names it with the fix. Stops after 4 s; change: task WITHIN=10
   default:
     silent: true
+    vars:
+      PY: '{{if .DEV}}uv run --project packages/python 1xops{{else}}uvx 1xops@latest{{end}}'
     cmds:
       - |
-        if [ ! -f .env.1xops ]; then echo "👉 No .env.1xops here. Run: task setup"; else
-          out=$(uv run --project packages/python 1xops doctor --brief --within {{.WITHIN | default "4"}})
-          if [ -n "$out" ]; then echo "🔔 Needs attention:"; echo "$out"; else echo "✅ All connectors ready"; fi
+        if [ ! -f .env.1xops ]; then echo "👉 No .env.1xops here. Run: task setup"
+        elif ! command -v uvx >/dev/null; then echo "👉 Install uv first: https://docs.astral.sh/uv/getting-started/installation/"
+        else
+          rc=0; out=$({{.PY}} doctor --brief --within {{.WITHIN | default "4"}} 2>&1) || rc=$?
+          if [ $rc -ne 0 ]; then echo "👉 This 1xops release has no session check yet. Developers: task DEV=1"
+          elif [ -n "$out" ]; then echo "🔔 Needs attention:"; echo "$out"; else echo "✅ All connectors ready"; fi
         fi
       - echo
       - task --list
