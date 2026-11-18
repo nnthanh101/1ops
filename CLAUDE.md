@@ -14,8 +14,9 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
-- Git: work on `feature/*`, prove it with `task gate`, stage it on `develop` (`git merge --squash`),
-  delete the branch. The owner commits and pushes. Never commit, push, tag, publish or approve a deployment.
+- Git: work on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
+  switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
+  delete the branch and the worktree. The owner commits and pushes. Never commit, push, tag, publish or approve a deployment.
 - Guard rails advise or ask; they never block the owner.
 - Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `/1xops:read-only-cloud` (enterprise edition). The identity is the boundary; the rules only ask.
 
@@ -35,7 +36,15 @@ A criterion is done only when it is proven end to end as a customer: the publish
 in a real terminal (Terminal.app or iTerm2, screenshots with `screencapture`), read-only sign-ins and read-only
 operations only. The proof stays local in `tmp/` and is summarised to the owner in chat; it is **never posted** on an
 issue or anywhere public, because it can carry customer or tenant names. Write no new test code unless the owner asks; prove by running it end to end (`task ux`). Existing tests stay as the regression net.
-Commits say `Refs #N`, never `Closes`. Sessions move a story to Approval at most; only the owner closes it.
+Commits say `Refs #N`, never `Closes`. A session ticks a box only when its case is proven and seen, then asks the owner one
+question to approve; on the owner's yes it closes the issue in the owner's browser while the owner watches. Never close without that yes.
+
+**Finish a story yourself; the owner only approves.** A session does everything up to the owner's yes, without being asked:
+build, `task gate`, run every criterion as a customer, look at the screenshots, tick the boxes in the story and its test plan,
+and move the story to Approval. Then it asks the owner **one** question with the evidence in three lines (what was proven,
+what the customer gains, what is not proven). On the owner's yes it closes the story, its tasks and its test plan and moves the board to Done,
+and opens the issue in the browser to confirm it. "For you to close" without that question is a deferral, not a hand-over.
+First ask what the change ships through: a plugin file, a test or a workflow ships with `develop`, with no release; only package code needs `task release`.
 
 ## Backlog: one story, one test plan, tasks just in time
 - **Story `1XOPS-NNN`** (issue type Feature, assigned to the owner) says what must be true and why it matters: Persona, Scenario (*Startup*, *Enterprise*), Story, Business value, one SMART **Objective**, Tasks and Acceptance criteria as tick boxes (Given/When/Then, measurable), the test plan link, Edition. Customer-facing; nothing else.
@@ -62,3 +71,15 @@ Commits say `Refs #N`, never `Closes`. Sessions move a story to Approval at most
 | A blocking git hook, a GitHub App, two approvals for one release, four tasks for one goal | Least that delivers the outcome; one command, one approval |
 | Test plans were folded into stories to look lean; 5W1H and audience notes were written into issues | Lean keeps what the end user values: one test plan per story, always. The scaffold stays in reasoning, never in customer-facing text |
 | The git hooks were made assistant-only, so the owner lost the advice; before that, the secret scan could leave GitHub Desktop waiting on Docker | Hooks advise everyone and never block: the owner overrides any advice and can switch it off per clone (`git config git-standard.advice off`); slow checks have a time limit |
+| The owner's checkout was switched to a feature branch; the owner's next commit landed on it, and switching back failed on their unsaved edit | Feature work lives in its own worktree. A branch that holds an owner commit is fast-forwarded into `develop`, never deleted |
+| The SSO cache's `expiresAt` was taken as "when the sign-in ends"; on the real machine it was the hourly token of a session that renews itself | Read the real file on this machine before building on what a field means; show a value only where it is true, never a guess |
+| `--probe` used `urllib`, which follows a redirect and sends the token's header to the new host | A request that carries a credential never follows a redirect; a 3xx is reported, not followed |
+| A parser treated "no scopes found" as "no write scopes", which would have shown a fine-grained GitHub token as ready | Access that cannot be read is `check`, never `ready`: when parsing fails, fall toward the safer verdict |
+| `ruff format packages/python` reformatted a file outside the change; a stale, ignored copy of the templates made Node read old rules | Run tools on the gate's own paths (`src tests`); remove generated copies before comparing the two channels |
+| A proof listener stopped before the second channel ran, and `localhost` resolved to IPv6 in Node, so the channels looked different | The harness outlives every run and uses `127.0.0.1`; a difference is a product failure only after the same check passed the other way |
+| `git commit -a` swept in 20 files of the owner's unsaved work; a later `git commit --amend` rewrote a commit another session had already pushed, and the push was rejected | Stage named files only (`git add <paths>`); never `-a`. Never `--amend` or reset a commit you did not just make: `git fetch` and read `git log origin/develop` first |
+| A scripted find-and-replace edited the first of two identical lines, in the Node.js job instead of the publish check; the gate caught it | After a scripted edit, read the `git diff` before the gate; make the edit match a line that is unique |
+| `env -i` left `node` off the PATH, so the npm channel looked broken; a screenshot grabbed the front window, which was an idle Terminal | Prove the check can pass before calling it a product failure; capture the window you started (`window whose tabs contains t`) and look at it before citing it |
+| The plugin version was never bumped by the release, and Claude Code updates an installed plugin only when it changes, so a fix on `develop` never reached existing installs | The plugin version is the release version: `release.sh` sets it and the Release check compares it with PyPI and npm |
+| A session ended its answer with "for you to close", then with a list of next steps | See "Finish a story yourself": prove, tick, move to Approval, ask one question, close on yes |
+| A story waited on the owner for steps the session could do itself (a read-only proof profile, a sign-in prompt, ticking proven boxes) | Do every real, read-only step yourself; stop only for an approval, a credential only the owner can create, or a cloud write |
