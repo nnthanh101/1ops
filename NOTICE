@@ -18,6 +18,9 @@ third-party component needs the maintainer's approval first.
 
 Upstream (git submodule, upstream/knowledge-work-plugins; plugins/operations links to it)
   knowledge-work-plugins   https://github.com/anthropics/knowledge-work-plugins   Apache-2.0
+  The 1xops plugin declares 12 of its plugins as dependencies, installed from that marketplace, not copied:
+  operations, cowork-plugin-management, customer-support, data, engineering, enterprise-search, finance,
+  human-resources, marketing, product-management, sales, small-business.
 
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT

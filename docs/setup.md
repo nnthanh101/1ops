@@ -67,6 +67,6 @@ gh api -X POST repos/nnthanh101/1xops/rulesets --input .github/rulesets/main.jso
 ## Release a version
 
 1. Set the version on `develop` and push it. If you skip this, `task release` stops and prints the one line to run.
-2. `task release VERSION=x.y.z STORY=n`, then approve the `release` environment once, at the link it prints. It merges `develop` into `main` once the checks pass, tags it, waits for PyPI, npm and the images, installs the release from every channel in clean containers and posts that proof on story `n`.
+2. `task release VERSION=x.y.z STORY=n`, then approve the `release` environment once, at the link it prints. It merges `develop` into `main` once the checks pass, tags it, waits for PyPI, npm and the images, installs the release from every channel in clean containers and keeps that proof in `tmp/` (never posted: it can carry tenant names).
 
-`task status` shows what customers can install today and each story's proof.
+`task status` shows what customers can install today, the proof kept in `tmp/` and CI health.

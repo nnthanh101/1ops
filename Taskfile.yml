@@ -1,19 +1,12 @@
 # 1xops tasks. Type `task`: it shows what needs attention now, then this list. `task --summary <name>` gives the business value and a real scenario.
-# Customer tasks run the released 1xops (from PyPI, through uv). Developers run this folder's source instead: task DEV=1 <task>
-#   👤 Customer   tasks/customer.yml   doctor · setup · config
-#   🔑 Owner      tasks/owner.yml      status · release
-#   🔧 Engineer   tests/Taskfile.yml   test · lint · image · ux · ci · gate
+# Customers use the 1xops command itself (1xops doctor, setup, config); these tasks are for working on this repository.
+#   task           the published 1xops names broken connectors here (task DEV=1: this folder's source)
+#   task release   ship the next version and prove it (owner)       task status   what customers can install, local proof, CI health
+#   tests/Taskfile.yml   gate · lint · test · image · ux · ci
 version: '3'
 
 includes:
-  customer:
-    taskfile: ./tasks/customer.yml
-    dir: .
-    flatten: true
-    vars:
-      PY: '{{if .DEV}}uv run --project packages/python 1xops{{else}}uvx 1xops@latest{{end}}'
-  owner:    {taskfile: ./tasks/owner.yml, dir: ., flatten: true}
-  tests:    {taskfile: ./tests/Taskfile.yml, flatten: true}
+  tests: {taskfile: ./tests/Taskfile.yml, flatten: true}
 
 tasks:
   # Business value: minutes saved at the start of an incident (story 1XOPS-009, issue #38).
@@ -24,7 +17,7 @@ tasks:
       PY: '{{if .DEV}}uv run --project packages/python 1xops{{else}}uvx 1xops@latest{{end}}'
     cmds:
       - |
-        if [ ! -f .env.1xops ]; then echo "👉 No .env.1xops here. Run: task setup"
+        if [ ! -f .env.1xops ]; then echo "👉 No .env.1xops here. Run: {{.PY}} setup"
         elif ! command -v uvx >/dev/null; then echo "👉 Install uv first: https://docs.astral.sh/uv/getting-started/installation/"
         else
           rc=0; out=$({{.PY}} doctor --brief --within {{.WITHIN | default "4"}} 2>&1) || rc=$?
@@ -33,3 +26,19 @@ tasks:
         fi
       - echo
       - task --list
+
+  status:
+    desc: '📊 What customers can install today, each story''s local proof, product health'
+    summary: |
+      Business value: release decisions rest on what is proven, not on what is planned.
+      Scenario: before the weekly review the owner checks which versions are published and proven on this machine.
+    cmds: [bash scripts/status.sh]
+
+  release:
+    desc: '🚀 Owner only: ship the next version, then prove each channel'
+    summary: |
+      Business value: one approval ships PyPI, npm and the image at the same version; the gate runs first and nothing is pushed if it fails.
+      Scenario: a fix is ready. One command runs the gate, publishes, and proves each install. Proof stays in tmp/.
+      Usage: task release STORY=n [BUMP=minor|major] [VERSION=x.y.z]
+    interactive: true
+    cmds: ['BUMP={{.BUMP}} VERSION={{.VERSION}} STORY={{.STORY}} bash scripts/release.sh']
