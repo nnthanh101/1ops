@@ -16,7 +16,9 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
 - Git: work on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
   switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
-  delete the branch and the worktree. The owner commits and pushes. Never commit, push, tag, publish or approve a deployment.
+  delete the branch and the worktree. The session commits and releases: `task release STORY=n [BUMP=…]` end to end, then
+  proves the published package. The owner's only step is one click on the protected `release` environment, which the
+  session opens in the owner's browser. A session never approves a deployment itself and never force-pushes.
 - Guard rails advise or ask; they never block the owner.
 - Cloud access is read-only. Sessions use only read-only sign-ins: an AWS read-only role, from `AWS_BILLING_PROFILE` / `AWS_OPERATIONS_PROFILE`, never a typed name; an Azure Reader identity in its own `AZURE_CONFIG_DIR`, never the owner's own login. Run `1xops doctor` before the first cloud call; a row saying `can change things` means stop. Any AWS or Azure write asks first (`.claude/settings.json`), and the session proposes it, the owner runs it. Follow skill `/1xops:read-only-cloud` (enterprise edition). The identity is the boundary; the rules only ask.
 

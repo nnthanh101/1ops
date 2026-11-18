@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [BUMP=patch|minor|major] [VERSION=x.y.z] STORY=n release.sh (all optional) - ship a version and prove it, as one command. Owner only: it commits
+# [BUMP=patch|minor|major] [VERSION=x.y.z] STORY=n release.sh (all optional) - ship a version and prove it, as one command. The session runs it; it commits
 # the version bump, merges into main and pushes a tag, and running it is the owner's yes. VERSION defaults to the latest
 # published version + 1. Local first: the tests, the Release workflow's tests (act) and the image build run on this
 # machine before anything is pushed. Then it merges develop into main once green, tags vVERSION, waits for the owner's one

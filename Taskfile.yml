@@ -35,7 +35,7 @@ tasks:
     cmds: [bash scripts/status.sh]
 
   release:
-    desc: '🚀 Owner only: ship the next version, then prove each channel'
+    desc: '🚀 Ship the next version, then prove each channel; the owner approves the release environment once'
     summary: |
       Business value: one approval ships PyPI, npm and the image at the same version; the gate runs first and nothing is pushed if it fails.
       Scenario: a fix is ready. One command runs the gate, publishes, and proves each install. Proof stays in tmp/.
