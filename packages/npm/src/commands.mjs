@@ -456,7 +456,7 @@ export function config(opts) {
   }
   const personal = scope === 'local' || scope === 'personal';
   let servers = {};
-  let wanted = s.BASELINE;
+  let wanted = s.template(scope);
   for (const [profile, values] of profiles) {
     // Shared files keep ${VAR}; private host config gets the person's values.
     Object.assign(servers, personal ? cf.substitute(profile.mcpServers, values) : profile.mcpServers);

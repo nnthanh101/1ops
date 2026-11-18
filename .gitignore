@@ -11,3 +11,5 @@ node_modules/
 .env.1xops
 packages/npm/profiles/
 tmp/
+packages/python/src/one_xops/templates/
+packages/npm/templates/

@@ -1,0 +1,146 @@
+{
+  "allowManagedPermissionRulesOnly": true,
+  "allowManagedMcpServersOnly": true,
+  "allowedMcpServers": [
+    {
+      "serverName": "awslabs-billing-cost-management"
+    },
+    {
+      "serverName": "awslabs-cloudtrail"
+    },
+    {
+      "serverName": "awslabs-cloudwatch"
+    },
+    {
+      "serverName": "awslabs-well-architected-security"
+    },
+    {
+      "serverName": "azure"
+    },
+    {
+      "serverName": "atlassian"
+    },
+    {
+      "serverName": "plugin:1xops:github"
+    },
+    {
+      "serverName": "plugin:1xops:azure-devops"
+    },
+    {
+      "serverName": "plugin:1xops:atlassian"
+    },
+    {
+      "serverName": "plugin:1xops:notion"
+    },
+    {
+      "serverName": "plugin:1xops:slack"
+    }
+  ],
+  "strictKnownMarketplaces": [
+    {
+      "source": "github",
+      "repo": "nnthanh101/1xops"
+    },
+    {
+      "source": "github",
+      "repo": "anthropics/knowledge-work-plugins"
+    },
+    {
+      "source": "github",
+      "repo": "1xOps/1xops-enterprise"
+    }
+  ],
+  "extraKnownMarketplaces": {
+    "1ops": {
+      "source": {
+        "source": "github",
+        "repo": "nnthanh101/1xops"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "1xops@1ops": true,
+    "operations@knowledge-work-plugins": true
+  },
+  "sandbox": {
+    "enabled": true
+  },
+  "permissions": {
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(~/.aws/credentials)",
+      "Read(~/.aws/sso/cache/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.ssh/**)",
+      "Bash(npm publish *)",
+      "Bash(uv publish *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push origin main *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(aws * create-*)",
+      "Bash(aws * delete-*)",
+      "Bash(aws * put-*)",
+      "Bash(aws * update-*)",
+      "Bash(aws * modify-*)",
+      "Bash(aws * terminate-*)",
+      "Bash(aws * start-*)",
+      "Bash(aws * stop-*)",
+      "Bash(aws * attach-*)",
+      "Bash(aws * detach-*)",
+      "Bash(aws * tag-*)",
+      "Bash(aws * untag-*)",
+      "Bash(aws s3 cp *)",
+      "Bash(aws s3 mv *)",
+      "Bash(aws s3 rm *)",
+      "Bash(aws s3 sync *)",
+      "Bash(aws cloudformation deploy *)",
+      "Bash(az * create*)",
+      "Bash(az * delete*)",
+      "Bash(az * update*)",
+      "Bash(az * start*)",
+      "Bash(az * stop*)",
+      "Bash(az * restart*)",
+      "Bash(az * deallocate*)",
+      "Bash(az * assign*)",
+      "Bash(az * add*)",
+      "Bash(az * remove*)",
+      "Bash(az * import*)",
+      "Bash(az * invoke*)",
+      "Bash(az rest *)"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git tag *)",
+      "Bash(git reset --hard *)",
+      "Bash(git branch -D *)",
+      "Bash(git checkout -b *)",
+      "Bash(git switch -c *)",
+      "Bash(git worktree add *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh release *)"
+    ],
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)"
+    ]
+  }
+}

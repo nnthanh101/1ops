@@ -30,6 +30,9 @@ dev = ["pytest>=9.2", "ruff>=0.17"]
 requires = ["hatchling>=1.33"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+artifacts = ["src/one_xops/templates/settings/*.json"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/one_xops"]
 

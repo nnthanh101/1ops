@@ -1,0 +1,46 @@
+{
+  "extraKnownMarketplaces": {
+    "1ops": {
+      "source": {
+        "source": "github",
+        "repo": "nnthanh101/1xops"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "1xops@1ops": true,
+    "operations@knowledge-work-plugins": true
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)"
+    ],
+    "ask": [
+      "Read(~/.aws/credentials)",
+      "Read(~/.aws/sso/cache/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.ssh/**)"
+    ],
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(gh issue *)",
+      "Bash(mkdir *)",
+      "Bash(tree *)",
+      "Bash(cd *)"
+    ]
+  }
+}
