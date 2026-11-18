@@ -204,7 +204,7 @@ def ask_subscription(found: dict) -> str:
                 highlight=False,
             )
             console.print(
-                "    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again. Or type the ID now.",
+                "    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again.",
                 highlight=False,
             )
             _shown.add("azure-none")

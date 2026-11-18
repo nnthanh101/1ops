@@ -142,7 +142,9 @@ def write(path: Path, text: str) -> None:
         old = path.read_bytes()
         if old == text.encode():
             return
-        path.with_name(path.name + ".bak").write_bytes(old)
+        bak = path.with_name(path.name + ".bak")
+        bak.write_bytes(old)
+        print(f"kept the previous file as {bak}")
     tmp = path.with_suffix(path.suffix + ".tmp")
     with tmp.open("w") as f:
         f.write(text)

@@ -320,16 +320,16 @@ def _aws_connector(var: str, values: dict[str, str]) -> tuple[str, str, str]:
             "check",
             f"{detail}; long-lived access key: use SSO, aws configure sso --profile {profile}",
         )
-    end = sso_end(profile)
-    if end:
+    end = sso_end(profile) if SIGN_IN_ENDS is not None else None
+    if end and SIGN_IN_ENDS is not None:
         SIGN_IN_ENDS[name] = (end, f"aws sso login --profile {profile}")
         detail += f", signed in until {end:%Y-%m-%d %H:%M} UTC"
     return name, "ready" if access == "read" else "check", detail
 
 
-SIGN_IN_ENDS: dict[
-    str, tuple[datetime, str]
-] = {}  # connector: (when its sign-in ends, the sign-in command)
+# connector: (when its sign-in ends, the sign-in command). A dict only during `1xops doctor`, fresh each run;
+# None elsewhere, so the session-start check and setup make no extra calls.
+SIGN_IN_ENDS: dict[str, tuple[datetime, str]] | None = None
 
 
 def sso_end(profile: str) -> datetime | None:
@@ -584,6 +584,13 @@ def plugin_connectors() -> list[tuple[str, str, str]]:
 PROBE = False  # doctor --probe: only then is a request sent to a connector's server
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect is reported, never followed: urllib would send the token's header on to the new host."""
+
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
 def probe(server: dict) -> tuple[str, str]:
     """(status, fix) from one MCP initialize request with the server's own header token. Sent only with --probe."""
     expand = lambda v: NEEDS.sub(lambda m: os.environ.get(m.group(1), ""), str(v))
@@ -603,7 +610,7 @@ def probe(server: dict) -> tuple[str, str]:
         expand(server.get("url", "")), json.dumps(body).encode(), headers, method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as res:
+        with urllib.request.build_opener(_NoRedirect).open(req, timeout=5) as res:
             code = res.status
     except urllib.error.HTTPError as exc:
         code = exc.code
@@ -611,6 +618,8 @@ def probe(server: dict) -> tuple[str, str]:
         return "broken", "does not answer: check the url and the network"
     if 200 <= code < 300:
         return "check", "answers; confirm the token is read-only"
+    if 300 <= code < 400:
+        return "unknown", f"answered {code}, a redirect elsewhere: check the url"
     if code in (401, 403):
         return "signed out", "token refused: put a valid read-only token in .env.1xops"
     return "unknown", f"answered {code}; cannot tell if it works: run /mcp in the assistant"
@@ -709,8 +718,9 @@ def cmd_brief(args: argparse.Namespace) -> int:
 def cmd_doctor(args: argparse.Namespace) -> int:
     if getattr(args, "brief", False) or getattr(args, "hook", False):
         return cmd_brief(args)
-    global PROBE
+    global PROBE, SIGN_IN_ENDS
     PROBE = bool(getattr(args, "probe", False))
+    SIGN_IN_ENDS = {}
     # The identity calls take seconds; a spinner on a terminal, nothing when piped.
     with console.status("Checking tools, sign-ins and connectors (read-only)…"):
         rows = check_tools() + [check_edition()] + check_sign_in(args.aws_profile)
@@ -759,8 +769,8 @@ def next_steps(shown: list[tuple[str, str, str, str]]) -> list[Text]:
     todo += [
         (name, f"sign-in ends {end:%Y-%m-%d %H:%M} UTC: {fix}")
         for name, needed, result, _ in shown
-        if result == "ready" and name in SIGN_IN_ENDS
-        for end, fix in [SIGN_IN_ENDS[name]]
+        if result == "ready" and name in (SIGN_IN_ENDS or {})
+        for end, fix in [(SIGN_IN_ENDS or {})[name]]
         if end <= soon
     ]
     if not todo:

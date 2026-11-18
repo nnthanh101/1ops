@@ -187,15 +187,17 @@ export function awsConnector(v, values) {
   const access = accessFromRole(id.Arn ?? '');
   let detail = `profile ${profile}, account ${mask(account)}, ${ACCESS[access]}`;
   if (longLivedKey(profile)) return [name, 'check', `${detail}; long-lived access key: use SSO, aws configure sso --profile ${profile}`];
-  const end = ssoEnd(profile);
-  if (end) {
+  const end = SIGN_IN_ENDS ? ssoEnd(profile) : null;
+  if (end && SIGN_IN_ENDS) {
     SIGN_IN_ENDS[name] = [end, `aws sso login --profile ${profile}`];
     detail += `, signed in until ${utc(end)} UTC`;
   }
   return [name, access === 'read' ? 'ready' : 'check', detail];
 }
 
-export const SIGN_IN_ENDS = {}; // connector: [when its sign-in ends, the sign-in command]
+// connector: [when its sign-in ends, the sign-in command]. An object only during `1xops doctor`, fresh each run;
+// null elsewhere, so the session-start check and setup make no extra calls.
+let SIGN_IN_ENDS = null;
 const utc = (d) => d.toISOString().slice(0, 16).replace('T', ' ');
 
 // When an SSO sign-in that cannot renew itself ends, from the AWS CLI's own cache; only `expiresAt` is read.
@@ -336,11 +338,12 @@ export function probe(server) {
   const headers = Object.fromEntries(Object.entries(server.headers ?? {}).map(([k, v]) => [k, expand(v)]));
   Object.assign(headers, { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' });
   const body = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: '1xops', version: PROBE.version ?? '' } } };
-  const code = `let s='';process.stdin.on('data',(d)=>s+=d).on('end',async()=>{const r=JSON.parse(s);try{const res=await fetch(r.url,{method:'POST',headers:r.headers,body:r.body,signal:AbortSignal.timeout(5000)});process.stdout.write(String(res.status))}catch{process.stdout.write('0')}})`;
+  const code = `let s='';process.stdin.on('data',(d)=>s+=d).on('end',async()=>{const r=JSON.parse(s);try{const res=await fetch(r.url,{method:'POST',headers:r.headers,body:r.body,redirect:'manual',signal:AbortSignal.timeout(5000)});process.stdout.write(String(res.status))}catch{process.stdout.write('0')}})`;
   const p = spawnSync(process.execPath, ['-e', code], { input: JSON.stringify({ url: expand(server.url ?? ''), headers, body: JSON.stringify(body) }), encoding: 'utf8', timeout: 10000 });
   const status = Number(p.stdout) || 0;
   if (!status) return ['broken', 'does not answer: check the url and the network'];
   if (status >= 200 && status < 300) return ['check', 'answers; confirm the token is read-only'];
+  if (status >= 300 && status < 400) return ['unknown', `answered ${status}, a redirect elsewhere: check the url`]; // never followed with the token
   if (status === 401 || status === 403) return ['signed out', 'token refused: put a valid read-only token in .env.1xops'];
   return ['unknown', `answered ${status}; cannot tell if it works: run /mcp in the assistant`];
 }
@@ -390,6 +393,7 @@ const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out'
 export function doctor(opts, version) {
   if (opts.brief || opts.hook) return brief(opts);
   PROBE.on = Boolean(opts.probe);
+  SIGN_IN_ENDS = {};
   PROBE.version = version;
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
@@ -550,6 +554,7 @@ function write(file, data) {
     const old = readFileSync(file);
     if (old.equals(Buffer.from(text))) return;
     writeFileSync(`${file}.bak`, old);
+    console.log(`kept the previous file as ${file}.bak`);
   }
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, text, { flush: true }); // on disk before the swap
@@ -574,6 +579,7 @@ export function config(opts) {
   try {
     return configure(opts);
   } catch (err) {
+    if (err instanceof TypeError || err instanceof ReferenceError || err instanceof RangeError) throw err; // a bug, not a setting
     console.log(color('red', err.message));
     return 2;
   }
@@ -842,7 +848,7 @@ export async function setup(opts) {
       if (!rows.length) {
         if (!azureShown) {
           console.log('  No Azure Reader sign-in found. Use a Reader identity in its own folder, never your own login:');
-          console.log('    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again. Or type the ID now.');
+          console.log('    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again.');
           azureShown = true;
         }
         const def = process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '';
