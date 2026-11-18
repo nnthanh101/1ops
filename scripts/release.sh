@@ -32,14 +32,17 @@ task gate >tmp/gate-release.log 2>&1 || { echo "release: task gate fails; see tm
 
 py=$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
 js=$(node -p "require('./packages/npm/package.json').version")
-if [ "$py" != "$V" ] || [ "$js" != "$V" ]; then
+pl=$(node -p "require('./plugins/1xops/.claude-plugin/plugin.json').version")
+if [ "$py" != "$V" ] || [ "$js" != "$V" ] || [ "$pl" != "$V" ]; then
   sed -i.bak -E "s/^version = \"[^\"]+\"/version = \"$V\"/" packages/python/pyproject.toml && rm packages/python/pyproject.toml.bak
   # only the version line changes; npm pkg set would reflow the whole file
   node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.argv[2]}"`))' packages/npm/package.json "$V"
+  # the plugin version too: Claude Code updates an installed plugin only when this number changes
+  node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.argv[2]}"`))' plugins/1xops/.claude-plugin/plugin.json "$V"
   uv lock --project packages/python -q
   git --no-pager diff --stat
   echo "release: version $py -> $V, committed and pushed to develop"
-  git commit -q -m "chore: release v$V${STORY:+ (Refs #$STORY)}" packages/python/pyproject.toml packages/python/uv.lock packages/npm/package.json
+  git commit -q -m "chore: release v$V${STORY:+ (Refs #$STORY)}" packages/python/pyproject.toml packages/python/uv.lock packages/npm/package.json plugins/1xops/.claude-plugin/plugin.json
   git push -q origin develop
 fi
 

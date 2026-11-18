@@ -97,6 +97,8 @@ jobs:
           py=$(grep -E '^version = ' ../python/pyproject.toml | cut -d'"' -f2)
           js=$(node -p "require('./package.json').version")
           test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
+          pl=$(node -p "require('./plugins/1xops/.claude-plugin/plugin.json').version")
+          test "$py" = "$pl" || { echo "pyproject $py != plugin.json $pl: installed plugins would not update"; exit 1; }
       - name: Tests (native Node.js, no dependencies)
         run: npm test
       - run: npm pack --dry-run
