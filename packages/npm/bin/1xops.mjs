@@ -73,7 +73,7 @@ try {
 }
 if (command === 'doctor' && opts.within !== undefined) {
   opts.within = Number(opts.within);
-  if (!(opts.within >= 0)) {
+  if (!(opts.within >= 0) || !Number.isFinite(opts.within)) {
     console.error('1xops doctor: --within must be a number of seconds');
     process.exit(2);
   }

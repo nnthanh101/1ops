@@ -15,6 +15,7 @@ Every other KEY=value line is a value for the ${KEY} references in the connector
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -23,7 +24,42 @@ from one_xops import settings as s
 DEFAULT_FILE = ".env.1xops"
 VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-[^}]*)?\}")
 KEY = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-SECRET_HINTS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY")
+SECRET_HINTS = ("TOKEN", "SECRET", "PASSWORD", "PASSWD", "API_KEY", "PRIVATE_KEY", "CREDENTIAL")
+# A value that is itself a credential, whatever its key: AWS access key, GitHub, Slack, Atlassian token, PEM key.
+SECRET_VALUE = re.compile(
+    r"\b(AKIA|ASIA)[A-Z0-9]{16}\b|\b(ghp|gho|ghs|ghu|github_pat)_[A-Za-z0-9_]{20,}|\bxox[abposr]-|ATATT3|-----BEGIN"
+)
+# Keys that change how a shell or a program starts: `1xops env` would export them, so they are refused.
+UNSAFE_KEYS = {
+    "PATH",
+    "PROMPT_COMMAND",
+    "BASH_ENV",
+    "ENV",
+    "IFS",
+    "SHELLOPTS",
+    "BASHOPTS",
+    "CDPATH",
+    "NODE_OPTIONS",
+    "NODE_PATH",
+    "PYTHONPATH",
+    "PYTHONSTARTUP",
+    "PYTHONHOME",
+    "PERL5OPT",
+    "RUBYOPT",
+    "GIT_SSH_COMMAND",
+    "EDITOR",
+    "VISUAL",
+    "PAGER",
+    "HOME",
+    "ZDOTDIR",
+    "PS1",
+    "PS2",
+    "PS3",
+    "PS4",
+}
+UNSAFE_PREFIXES = ("LD_", "DYLD_", "BASH_FUNC_")
+# Sign-in locations a cloned folder must not provide: an AWS config file can run any credential_process.
+SIGN_IN_PATHS = ("AWS_CONFIG_FILE", "AZURE_CONFIG_DIR")
 OWN = {"ONEXOPS_SCOPE", "ONEXOPS_DIR", "ONEXOPS_OUT", "ONEXOPS_CONNECTORS"}
 KNOWN = OWN | {"ONEXOPS_IGNORE"}  # IGNORE stays among the values: doctor reads it
 
@@ -77,11 +113,36 @@ def load(path: Path) -> dict:
                 f"{path}: {key} looks like a secret; keep it in your keychain or sign-in, "
                 "not in this file"
             )
+    for key, value in pairs.items():
+        if key in UNSAFE_KEYS or key.startswith(UNSAFE_PREFIXES):
+            raise ValueError(
+                f"{path}: {key} changes how a shell or program starts; it does not belong in this file"
+            )
+        if SECRET_VALUE.search(value):
+            raise ValueError(
+                f"{path}: the value of {key} looks like a key or token; keep it in your keychain or "
+                "sign-in, not in this file"
+            )
+        if key in SIGN_IN_PATHS and value:
+            folder = path.resolve().parent
+            target = (folder / Path(value).expanduser()).resolve()
+            if target == folder or folder in target.parents:
+                raise ValueError(
+                    f"{path}: {key} points inside this folder; keep sign-in files outside it "
+                    "(for example ~/.aws/tenants/<tenant>/config), so a copied folder cannot "
+                    "run its own sign-in commands"
+                )
     scope = pairs.get("ONEXOPS_SCOPE", "team")
     if scope not in s.SCOPES:
         raise ValueError(f"{path}: ONEXOPS_SCOPE must be one of {', '.join(s.SCOPES)}")
     values = {k: v for k, v in pairs.items() if k not in OWN}
     names = [c.strip() for c in pairs.get("ONEXOPS_CONNECTORS", "").split(",") if c.strip()]
+    # your own profile file is read from this file's folder, wherever 1xops runs
+    here = os.path.dirname(os.path.abspath(path))
+    names = [
+        os.path.normpath(os.path.join(here, os.path.expanduser(n))) if n.endswith(".json") else n
+        for n in names
+    ]
     return {
         "scope": scope,
         "dir": pairs.get("ONEXOPS_DIR", "."),

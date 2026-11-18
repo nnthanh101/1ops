@@ -39,12 +39,23 @@ jobs:
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             echo "$branch already exists; merge or close that PR first"; exit 0
           fi
-          ops=$(git -C upstream/knowledge-work-plugins log --oneline "$old..$new" -- operations | head -20)
+          # The upstream plugins 1xops depends on, read from plugin.json so the list is never kept twice
+          deps=$(jq -r '.dependencies[] | select(endswith("@knowledge-work-plugins")) | sub("@.*"; "")' \
+            plugins/1xops/.claude-plugin/plugin.json)
+          # shellcheck disable=SC2086 # one path argument per plugin folder
+          ops=$(git -C upstream/knowledge-work-plugins log --oneline -30 "$old..$new" -- $deps)
+          # A pull request opened with GITHUB_TOKEN starts no workflow, so the plugin checks of the Release
+          # workflow (the only ones the pin can change) run here, before the PR exists.
+          npm install --no-save --prefix "$RUNNER_TEMP/v" @anthropic-ai/claude-code@2.1.325
+          node "$RUNNER_TEMP/v/node_modules/@anthropic-ai/claude-code/install.cjs"
+          "$RUNNER_TEMP/v/node_modules/.bin/claude" plugin validate --strict .
+          "$RUNNER_TEMP/v/node_modules/.bin/claude" plugin validate --strict plugins/1xops
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git commit -am "chore: knowledge-work-plugins $old → $new"
           git push -u origin "$branch"
           body="Monthly upstream pin bump. All upstream changes: https://github.com/anthropics/knowledge-work-plugins/compare/$old...$new"
-          body="$body"$'\n\n'"Changes under operations/ (the plugin 1xops depends on):"$'\n\n'"${ops:-none}"
+          body="$body"$'\n\n'"Plugin validation passed in the bump job (strict, pinned validator). Run task gate locally before merging."
+          body="$body"$'\n\n'"Changes in the plugins 1xops depends on ($(echo $deps | tr ' ' ',')):"$'\n\n'"${ops:-none}"
           gh pr create --base develop --title "chore: knowledge-work-plugins $old → $new" --body "$body"

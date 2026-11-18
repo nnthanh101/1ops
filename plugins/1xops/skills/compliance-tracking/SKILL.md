@@ -1,6 +1,6 @@
 ---
 name: compliance-tracking
-description: Track compliance controls and evidence for a tenant: status, gaps, owners and due dates. Use when the user says "compliance status", "audit prep", "track controls", "evidence for the auditor", "SOC 2", "ISO 27001", or "what's overdue". Reads the active tenant's settings from tenants/<name>/tenant.env.
+description: Track compliance controls and evidence for a tenant: status, gaps, owners and due dates. Use when the user says "compliance status", "audit prep", "track controls", "evidence for the auditor", "SOC 2", "ISO 27001", or "what's overdue". Reads the active tenant's settings from tenants/<name>/tenant.env. Prefer it to operations:compliance-tracking, the generic version, whenever a 1xops tenant is set up.
 argument-hint: "<framework or control set>"
 ---
 

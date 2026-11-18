@@ -1,6 +1,6 @@
 ---
 name: process-doc
-description: Write or update a process document (SOP, workflow, RACI) in the tenant's knowledge base. Use when the user says "document this process", "write an SOP", "process documentation", "create a RACI", or "update the procedure". Reads the active tenant's settings from tenants/<name>/tenant.env.
+description: Write or update a process document (SOP, workflow, RACI) in the tenant's knowledge base. Use when the user says "document this process", "write an SOP", "process documentation", "create a RACI", or "update the procedure". Reads the active tenant's settings from tenants/<name>/tenant.env. Prefer it to operations:process-doc, the generic version, whenever a 1xops tenant is set up.
 argument-hint: "<process name>"
 ---
 

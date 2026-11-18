@@ -369,14 +369,30 @@ const enterpriseSteps = (folder) => [
   [s.HOST, 'plugin', 'install', '1xops@1xops'],
 ];
 
+const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/;
+
+// Members a bundle may not hold, as Python's tarfile filter="data" refuses them: absolute paths, '..', links, devices.
+function unsafeMembers(file) {
+  const names = run('tar', ['-tzf', file], 120000);
+  const long = run('tar', ['-tvzf', file], 120000);
+  if (names.code !== 0 || long.code !== 0) return ['the bundle cannot be read'];
+  const list = names.out.split('\n').filter(Boolean);
+  const types = long.out.split('\n').filter(Boolean).map((l) => l[0]); // one line per member, same order
+  return list.filter((n, i) => n.startsWith('/') || n.split('/').includes('..') || !'-d'.includes(types[i] ?? '?'))
+    .map((n) => `'${n}' is not a plain file or folder inside the bundle`);
+}
+
 // The enterprise bundle's version, read without unpacking (the system tar, so no dependency).
 export function bundleVersion(file) {
   const member = (m) => { const r = run('tar', ['-xzOf', file, m]); if (r.code !== 0) throw new Error(); return JSON.parse(r.out); };
   let market, plugin;
   try { market = member('.claude-plugin/marketplace.json'); plugin = member('plugins/1xops/.claude-plugin/plugin.json'); }
   catch { throw new Error(`${file} is not a 1xops enterprise bundle`); }
-  if (market.name !== '1xops' || plugin.name !== '1xops') throw new Error(`${file} is not a 1xops enterprise bundle`);
-  return String(plugin.version ?? '0');
+  if (market?.name !== '1xops' || plugin?.name !== '1xops') throw new Error(`${file} is not a 1xops enterprise bundle`);
+  const version = String(plugin.version ?? '');
+  // it names the install folder: never a path
+  if (!SEMVER.test(version)) throw new Error(`${file} is not a 1xops enterprise bundle (version '${version}')`);
+  return version;
 }
 
 export function install(opts) {
@@ -397,8 +413,10 @@ export function install(opts) {
     steps = enterpriseSteps(folder);
     console.log(color('bold', `$ unpack ${opts.file} into ${folder}`));
     if (opts.yes) {
+      const bad = unsafeMembers(opts.file);
+      if (bad.length) { console.log(color('red', `${opts.file} is not a safe 1xops enterprise bundle: ${bad[0]}`)); return 2; }
       mkdirSync(folder, { recursive: true });
-      const r = run('tar', ['-xzf', opts.file, '-C', folder]);
+      const r = run('tar', ['-xzf', opts.file, '-C', folder, '--no-same-owner'], 300000);
       if (r.code !== 0) { console.log(r.out); return r.code; }
     }
   }
@@ -535,6 +553,8 @@ export function config(opts) {
 
 const shellQuote = (v) => (/^[A-Za-z0-9@%+=:,./_-]+$/.test(v) ? v : `'${v.replaceAll("'", `'"'"'`)}'`);
 
+const TENANTS_AT_ONCE = 8; // each check signs in to AWS and Azure: a limit keeps 200 tenants from 400 sign-ins at once
+
 // One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing.
 export async function tenants(opts) {
   const root = opts.folder ?? '.';
@@ -544,20 +564,25 @@ export async function tenants(opts) {
   } catch { /* not a folder */ }
   if (!folders.length) { console.log(`No tenant folders (a folder with its own ${cf.DEFAULT_FILE}) under ${root}.`); return 0; }
   const bin = join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', '1xops.mjs');
-  const results = await Promise.all(folders.map((name) => new Promise((resolve) => {
+  const check = (name) => new Promise((resolve) => {
     const child = spawn(process.execPath, [bin, 'doctor', '--brief', '--within', '8'], { cwd: join(root, name) });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    child.on('close', () => resolve([name, out.split('\n').filter((l) => l.trim())]));
-  })));
+    child.on('close', (code) => resolve([name, code ?? 1, out.split('\n').filter((l) => l.trim())]));
+  });
+  const results = new Array(folders.length);
+  let next = 0;
+  const worker = async () => { while (next < folders.length) { const i = next++; results[i] = await check(folders[i]); } };
+  await Promise.all(Array.from({ length: Math.min(TENANTS_AT_ONCE, folders.length) }, worker));
   let need = 0;
-  for (const [name, lines] of results) {
-    if (lines.length) { need += 1; console.log(`✗ ${name}: ${scrub(lines[0])}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}`); }
+  for (const [name, code, lines] of results) {
+    if (code !== 0) { need += 1; console.log(`✗ ${name}: the check failed (exit ${code}): ${lines.length ? scrub(lines.at(-1)) : 'no output'}`); }
+    else if (lines.length) { need += 1; console.log(`✗ ${name}: ${scrub(lines[0])}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}`); }
     else console.log(`✓ ${name}: ready`);
   }
   console.log(`${folders.length} tenants, ${need} need attention`);
-  return 0;
+  return need ? 1 : 0;
 }
 
 export function env(opts) {
@@ -568,7 +593,10 @@ export function env(opts) {
     console.error(err.message);
     return 2;
   }
-  for (const [k, v] of Object.entries(cfg.values)) console.log(`export ${k}=${shellQuote(v)}`);
+  for (const [k, v] of Object.entries(cfg.values)) {
+    const value = v === '~' || v.startsWith('~/') ? homedir() + v.slice(1) : v;
+    console.log(`export ${k}=${shellQuote(value)}`);
+  }
   return 0;
 }
 

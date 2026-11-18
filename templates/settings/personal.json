@@ -15,7 +15,18 @@
   },
   "enabledPlugins": {
     "1xops@1ops": true,
-    "operations@knowledge-work-plugins": true
+    "operations@knowledge-work-plugins": true,
+    "cowork-plugin-management@knowledge-work-plugins": true,
+    "customer-support@knowledge-work-plugins": true,
+    "data@knowledge-work-plugins": true,
+    "engineering@knowledge-work-plugins": true,
+    "enterprise-search@knowledge-work-plugins": true,
+    "finance@knowledge-work-plugins": true,
+    "human-resources@knowledge-work-plugins": true,
+    "marketing@knowledge-work-plugins": true,
+    "product-management@knowledge-work-plugins": true,
+    "sales@knowledge-work-plugins": true,
+    "small-business@knowledge-work-plugins": true
   },
   "permissions": {
     "deny": [
@@ -42,6 +53,15 @@
       "Bash(aws s3 rm *)",
       "Bash(aws s3 sync *)",
       "Bash(aws cloudformation deploy *)",
+      "Bash(aws * run-instances *)",
+      "Bash(aws ssm send-command *)",
+      "Bash(aws ssm start-session *)",
+      "Bash(aws lambda invoke *)",
+      "Bash(aws * authorize-*)",
+      "Bash(aws * revoke-*)",
+      "Bash(aws * reboot-*)",
+      "Bash(aws s3 rb *)",
+      "Bash(aws s3api put-*)",
       "Bash(az * create*)",
       "Bash(az * delete*)",
       "Bash(az * update*)",

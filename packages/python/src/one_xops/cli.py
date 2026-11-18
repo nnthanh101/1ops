@@ -53,6 +53,9 @@ def enterprise_steps(folder: str) -> list[list[str]]:
     ]
 
 
+SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$")
+
+
 def bundle_version(path: str) -> str:
     """The enterprise bundle's version, read without unpacking. ValueError if it is not a 1xops enterprise bundle."""
     import tarfile
@@ -61,11 +64,23 @@ def bundle_version(path: str) -> str:
         with tarfile.open(path, "r:gz") as tar:
             market = json.load(tar.extractfile(".claude-plugin/marketplace.json"))
             plugin = json.load(tar.extractfile("plugins/1xops/.claude-plugin/plugin.json"))
-    except (OSError, KeyError, tarfile.TarError, ValueError, TypeError) as exc:
+    except (
+        OSError,
+        EOFError,
+        KeyError,
+        tarfile.TarError,
+        ValueError,
+        TypeError,
+        AttributeError,
+    ) as exc:
         raise ValueError(f"{path} is not a 1xops enterprise bundle") from exc
-    if market.get("name") != "1xops" or plugin.get("name") != "1xops":
+    named = [d.get("name") if isinstance(d, dict) else None for d in (market, plugin)]
+    if named != ["1xops", "1xops"]:
         raise ValueError(f"{path} is not a 1xops enterprise bundle")
-    return str(plugin.get("version", "0"))
+    version = str(plugin.get("version", ""))
+    if not SEMVER.match(version):  # it names the install folder: never a path
+        raise ValueError(f"{path} is not a 1xops enterprise bundle (version {version!r})")
+    return version
 
 
 class OutOfTime(Exception):
@@ -179,7 +194,11 @@ def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
             cmd += ["--profile", aws_profile]
         code, out = _run(cmd)
         if code == 0:
-            ident = json.loads(out)
+            try:
+                ident = json.loads(out)
+            except ValueError:
+                ident = {}
+            ident = ident if isinstance(ident, dict) else {}
             access = access_from_role(ident.get("Arn", ""))
             rows.append(
                 (
@@ -521,6 +540,17 @@ SKIP_AT_START = ("ready", "in host")
 QUIET = ("signs in inside the host", "no sign-in check")
 
 
+def _seconds(text: str) -> float:
+    """--within: a finite, non-negative number of seconds (as the Node.js tool accepts)."""
+    try:
+        value = float(text)
+    except ValueError:
+        value = -1.0
+    if not (0 <= value < float("inf")):
+        raise argparse.ArgumentTypeError("--within must be a number of seconds")
+    return value
+
+
 def brief_text(file: str, within: float | None) -> str:
     """Session start: one line per connector that is not ready, with its fix. Nothing when all is ready.
     Never raises; a check that runs out of time or fails adds one line saying so."""
@@ -643,9 +673,14 @@ def cmd_install(args: argparse.Namespace) -> int:
         if args.yes:
             import tarfile
 
-            Path(folder).mkdir(parents=True, exist_ok=True)
-            with tarfile.open(bundle, "r:gz") as tar:
-                tar.extractall(folder, filter="data")
+            try:
+                Path(folder).mkdir(parents=True, exist_ok=True)
+                with tarfile.open(bundle, "r:gz") as tar:
+                    tar.extractall(folder, filter="data")
+            except (OSError, EOFError, tarfile.TarError) as exc:
+                msg = f"{bundle} is not a safe 1xops enterprise bundle: {exc}"
+                console.print(Text(msg, style="red"), soft_wrap=True)
+                return 2
     for step in steps:
         step = [*step, "--scope", args.scope]
         console.print(Text(f"$ {' '.join(step)}", style="bold"), soft_wrap=True)
@@ -784,6 +819,11 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+TENANTS_AT_ONCE = (
+    8  # each check signs in to AWS and Azure: a limit keeps 200 tenants from 400 sign-ins at once
+)
+
+
 def cmd_tenants(args: argparse.Namespace) -> int:
     """One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing."""
     root = Path(args.folder)
@@ -795,27 +835,37 @@ def cmd_tenants(args: argparse.Namespace) -> int:
     if not folders:
         print(f"No tenant folders (a folder with its own {cf.DEFAULT_FILE}) under {root}.")
         return 0
-    cmd = [sys.executable, "-m", "one_xops.cli", "doctor", "--brief", "--within", "8"]
-    runs = [
-        (
-            f,
-            subprocess.Popen(
-                cmd, cwd=f, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            ),
+    from concurrent.futures import ThreadPoolExecutor
+
+    cmd = [sys.executable, "-P", "-m", "one_xops.cli", "doctor", "--brief", "--within", "8"]
+
+    def check(folder: Path) -> tuple[int, list[str]]:
+        p = subprocess.run(
+            cmd,
+            cwd=folder,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
         )
-        for f in folders
-    ]
+        return p.returncode, [ln for ln in p.stdout.splitlines() if ln.strip()]
+
+    with ThreadPoolExecutor(max_workers=TENANTS_AT_ONCE) as pool:
+        results = list(pool.map(check, folders))
     need = 0
-    for folder, proc in runs:
-        lines = [ln for ln in proc.communicate()[0].splitlines() if ln.strip()]
-        if lines:
+    for folder, (code, lines) in zip(folders, results, strict=True):
+        if code != 0:
+            need += 1
+            first = scrub(lines[-1]) if lines else "no output"
+            print(f"✗ {folder.name}: the check failed (exit {code}): {first}")
+        elif lines:
             need += 1
             more = f" (+{len(lines) - 1} more)" if len(lines) > 1 else ""
             print(f"✗ {folder.name}: {scrub(lines[0])}{more}")
         else:
             print(f"✓ {folder.name}: ready")
     print(f"{len(folders)} tenants, {need} need attention")
-    return 0
+    return 1 if need else 0
 
 
 def cmd_env(args: argparse.Namespace) -> int:
@@ -826,6 +876,8 @@ def cmd_env(args: argparse.Namespace) -> int:
         print(exc, file=sys.stderr)
         return 2
     for key, value in cfg["values"].items():
+        if value == "~" or value.startswith("~/"):
+            value = os.path.expanduser(value)
         print(f"export {key}={shlex.quote(value)}")
     return 0
 
@@ -864,7 +916,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--brief", action="store_true", help="only connectors that are not ready, one line each"
     )
     p.add_argument("--hook", action="store_true", help="--brief in the host's session-start format")
-    p.add_argument("--within", type=float, help="seconds to spend, with --brief or --hook")
+    p.add_argument("--within", type=_seconds, help="seconds to spend, with --brief or --hook")
     p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("install", help="add the marketplaces and install the plugin")
