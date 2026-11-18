@@ -91,19 +91,40 @@ def load(path: Path) -> dict:
     }
 
 
+REASONS = {
+    "ONEXOPS_SCOPE": "who the settings are for: org, team, local or personal",
+    "ONEXOPS_DIR": "this tenant's folder",
+    "ONEXOPS_OUT": "where the files for IT are written",
+    "ONEXOPS_CONNECTORS": "the connectors this tenant uses",
+    "AWS_CONFIG_FILE": "this tenant's own AWS config file",
+    "AWS_BILLING_PROFILE": "read-only AWS sign-in for cost and savings questions",
+    "AWS_OPERATIONS_PROFILE": "read-only AWS sign-in for audit, monitoring and security review",
+    "AWS_REGION": "where this tenant's workloads run",
+    "AZURE_CONFIG_DIR": "this tenant's Reader identity folder",
+    "AZURE_TENANT_ID": "the Azure tenant of the Reader identity",
+    "AZURE_SUBSCRIPTION_ID": "the Azure subscription to read",
+}
+
+
+def _line(key: str, value: str) -> str:
+    reason = REASONS.get(key)
+    return f"{key}={value}" + (f"  # {reason}" if reason else "")
+
+
 def dump(config: dict) -> str:
     """The .env.1xops text for a config made by `1xops setup`."""
     lines = [
         "# 1xops: non-secret values only. Secrets stay in AWS SSO, az login or the Atlassian sign-in.",
-        f"ONEXOPS_SCOPE={config['scope']}",
+        _line("ONEXOPS_SCOPE", config["scope"]),
     ]
     if config.get("dir"):
-        lines.append(f"ONEXOPS_DIR={config['dir']}")
+        lines.append(_line("ONEXOPS_DIR", config["dir"]))
     if config.get("out"):
-        lines.append(f"ONEXOPS_OUT={config['out']}")
-    lines.append(f"ONEXOPS_CONNECTORS={','.join(config.get('connectors', {}))}")
+        lines.append(_line("ONEXOPS_OUT", config["out"]))
+    lines.append(_line("ONEXOPS_CONNECTORS", ",".join(config.get("connectors", {}))))
+    lines += [_line(k, v) for k, v in config.get("extra", {}).items()]
     seen: dict[str, str] = {}
     for values in config.get("connectors", {}).values():
         seen.update(values)
-    lines += [f"{k}={v}" for k, v in seen.items()]
+    lines += [_line(k, v) for k, v in seen.items()]
     return "\n".join(lines) + "\n"

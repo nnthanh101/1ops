@@ -72,16 +72,32 @@ export function load(file) {
 }
 
 // The .env.1xops text for a config made by `1xops setup`.
+const REASONS = {
+  ONEXOPS_SCOPE: 'who the settings are for: org, team, local or personal',
+  ONEXOPS_DIR: "this tenant's folder",
+  ONEXOPS_OUT: 'where the files for IT are written',
+  ONEXOPS_CONNECTORS: 'the connectors this tenant uses',
+  AWS_CONFIG_FILE: "this tenant's own AWS config file",
+  AWS_BILLING_PROFILE: 'read-only AWS sign-in for cost and savings questions',
+  AWS_OPERATIONS_PROFILE: 'read-only AWS sign-in for audit, monitoring and security review',
+  AWS_REGION: "where this tenant's workloads run",
+  AZURE_CONFIG_DIR: "this tenant's Reader identity folder",
+  AZURE_TENANT_ID: 'the Azure tenant of the Reader identity',
+  AZURE_SUBSCRIPTION_ID: 'the Azure subscription to read',
+};
+const line = (key, value) => `${key}=${value}${REASONS[key] ? `  # ${REASONS[key]}` : ''}`;
+
 export function dump(config) {
   const lines = [
     '# 1xops: non-secret values only. Secrets stay in AWS SSO, az login or the Atlassian sign-in.',
-    `ONEXOPS_SCOPE=${config.scope}`,
+    line('ONEXOPS_SCOPE', config.scope),
   ];
-  if (config.dir) lines.push(`ONEXOPS_DIR=${config.dir}`);
-  if (config.out) lines.push(`ONEXOPS_OUT=${config.out}`);
+  if (config.dir) lines.push(line('ONEXOPS_DIR', config.dir));
+  if (config.out) lines.push(line('ONEXOPS_OUT', config.out));
   const connectors = config.connectors ?? {};
-  lines.push(`ONEXOPS_CONNECTORS=${Object.keys(connectors).join(',')}`);
+  lines.push(line('ONEXOPS_CONNECTORS', Object.keys(connectors).join(',')));
+  for (const [k, v] of Object.entries(config.extra ?? {})) lines.push(line(k, v));
   const seen = Object.assign({}, ...Object.values(connectors));
-  for (const [k, v] of Object.entries(seen)) lines.push(`${k}=${v}`);
+  for (const [k, v] of Object.entries(seen)) lines.push(line(k, v));
   return `${lines.join('\n')}\n`;
 }

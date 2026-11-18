@@ -309,6 +309,61 @@ def connect(connectors: dict[str, dict[str, str]]) -> None:
                 "  itsm: sign in inside the assistant: start it in this folder, run /mcp and choose atlassian.",
                 markup=False,
             )
+            if shutil.which("claude") and Confirm.ask(
+                "  Start the assistant here now to sign in? (claude)", default=False
+            ):
+                subprocess.run(["claude"], check=False)
+    _verify(
+        "github",
+        cli._github_connector,
+        ["gh", "auth", "login", "--web", "--hostname", "github.com"],
+    )
+
+
+def _home(p: str) -> str:
+    """A path with the home folder written as ~, so the file works on another machine."""
+    home = str(Path.home())
+    return "~" + p[len(home) :] if p.startswith(home + os.sep) else p
+
+
+def tenant_aws_files() -> list[tuple[str, Path]]:
+    """(tenant, config file) for ~/.aws/tenants/<tenant>/config: one AWS config file per tenant."""
+    root = Path.home() / ".aws" / "tenants"
+    return sorted((p.parent.name, p) for p in root.glob("*/config") if p.is_file())
+
+
+def pick_aws_config() -> dict[str, str]:
+    """This tenant's own AWS config file, recorded in .env.1xops so no shell setting is needed."""
+    if os.environ.get("AWS_CONFIG_FILE"):
+        return {"AWS_CONFIG_FILE": _home(os.environ["AWS_CONFIG_FILE"])}
+    options = tenant_aws_files()
+    if not options:
+        return {}
+    table = Table(title=f"AWS config files, one per tenant ({len(options)})", title_style="bold")
+    for col in ("#", "tenant", "file"):
+        table.add_column(col, justify="right" if col == "#" else "left")
+    for n, (name, file) in enumerate(options, 1):
+        table.add_row(str(n), name, _home(str(file)))
+    console.print(table)
+    while True:
+        pick = Prompt.ask(
+            "  AWS_CONFIG_FILE: number or part of a tenant name (Enter skips)",
+            default="",
+            show_default=False,
+        ).strip()
+        if not pick or pick == "-":
+            return {}
+        hits = (
+            [options[int(pick) - 1]]
+            if pick.isdigit() and 1 <= int(pick) <= len(options)
+            else [o for o in options if not pick.isdigit() and pick.lower() in o[0].lower()]
+        )
+        if len(hits) == 1:
+            os.environ["AWS_CONFIG_FILE"] = str(hits[0][1])
+            return {"AWS_CONFIG_FILE": _home(str(hits[0][1]))}
+        console.print(
+            f"  No single tenant matches '{pick}': pick 1 to {len(options)}.", highlight=False
+        )
 
 
 def run(args: argparse.Namespace) -> int:
@@ -327,7 +382,14 @@ def run(args: argparse.Namespace) -> int:
     scope = Prompt.ask("Scope", choices=list(s.SCOPES), default="team")
     config: dict = {"scope": scope}
     if scope in ("team", "local"):
-        config["dir"] = Prompt.ask("Project or tenant folder", default=".")
+        folder = Prompt.ask(
+            f"Tenant folder (Enter = this folder: {Path.cwd()})", default=".", show_default=False
+        )
+        if args.file == cf.DEFAULT_FILE:  # the tenant's settings file lives in the tenant's folder
+            path = Path(folder) / cf.DEFAULT_FILE
+            config["dir"] = "."
+        else:
+            config["dir"] = folder
     if scope == "org":
         config["out"] = Prompt.ask("Folder to write the managed files to", default=".")
 
@@ -337,6 +399,12 @@ def run(args: argparse.Namespace) -> int:
         profile = s.load_profile(name)
         if not Confirm.ask(f"Add {name}: {profile.get('description', '')}?", default=False):
             continue
+        if name == "aws":
+            config.setdefault("extra", {}).update(pick_aws_config())
+        if name == "azure" and os.environ.get("AZURE_CONFIG_DIR"):
+            config.setdefault("extra", {})["AZURE_CONFIG_DIR"] = _home(
+                os.environ["AZURE_CONFIG_DIR"]
+            )
         values = {v: ask_value(v, found) for v in cf.variables(profile)}
         connectors[name] = {k: v for k, v in values.items() if v}
     own = Prompt.ask("Your own profile .json file (blank to skip)", default="", show_default=False)

@@ -342,6 +342,38 @@ def _azure_connector(values: dict[str, str] | None = None) -> tuple[str, str, st
     return "azure", "ready" if access == "read" else "check", AZURE_ACCESS[access]
 
 
+GITHUB_WRITE = re.compile(
+    r"^(repo|public_repo|workflow|gist|delete_repo|codespace|write:.*|admin:.*)$"
+)
+
+
+def _github_connector() -> tuple[str, str, str]:
+    """GitHub sign-in of the gh CLI: ready only when the token cannot change things. Prints no token."""
+    if not shutil.which("gh"):
+        return "github", "missing", "install the GitHub CLI"
+    code, out = _run(["gh", "auth", "status"])
+    if code != 0:
+        return "github", "signed out", "gh auth login --web"
+    user = re.search(r"account (\S+)", out)
+    who = f"signed in as {user.group(1)}" if user else "signed in"
+    scopes = re.search(r"Token scopes:\s*(.+)", out)
+    if not scopes:
+        return (
+            "github",
+            "check",
+            f"{who}; a fine-grained token's access cannot be read from here: give it read-only repository access",
+        )
+    names = re.findall(r"'([^']+)'", scopes.group(1)) or scopes.group(1).replace(" ", "").split(",")
+    writes = [n for n in names if GITHUB_WRITE.match(n)]
+    if writes:
+        return (
+            "github",
+            "check",
+            f"{who}; the token can change things ({', '.join(writes)}): use a fine-grained read-only token",
+        )
+    return "github", "ready", f"{who}, read-only scopes"
+
+
 def check_connectors(file: str, rows: list | None = None) -> list[tuple[str, str, str]]:
     """(connector, status, fix) for each connector in .env.1xops. Read-only identity calls only.
     Rows are added to `rows` as they are found, so a check that runs out of time keeps what it has."""
@@ -355,6 +387,12 @@ def check_connectors(file: str, rows: list | None = None) -> list[tuple[str, str
     except (ValueError, OSError) as exc:
         rows.append(("connectors", "missing", str(exc)))
         return rows
+    for key in (
+        "AWS_CONFIG_FILE",
+        "AZURE_CONFIG_DIR",
+    ):  # this tenant's own, never another tenant's from the shell
+        if cfg["values"].get(key):
+            os.environ[key] = os.path.expanduser(cfg["values"][key])
     if not cfg["connectors"]:
         rows.append(
             ("connectors", "missing", f"ONEXOPS_CONNECTORS is empty in {file}: run 1xops setup")
@@ -674,8 +712,9 @@ def _resolve(args: argparse.Namespace) -> tuple[str, Path, Path | None, dict[str
     """Scope, folder, org output and {connector: values}, from .env.1xops or the flags."""
     if args.file:
         cfg = cf.load(Path(args.file))
-        out = Path(cfg["out"]).resolve() if cfg["out"] else None
-        return cfg["scope"], Path(cfg["dir"]).resolve(), out, cfg["connectors"]
+        base = Path(args.file).resolve().parent  # a relative folder means: relative to this file
+        out = (base / cfg["out"]).resolve() if cfg["out"] else None
+        return cfg["scope"], (base / cfg["dir"]).resolve(), out, cfg["connectors"]
     out = Path(args.out).resolve() if args.out else None
     return args.scope, Path(args.dir).resolve(), out, {c: {} for c in args.connectors}
 
@@ -742,6 +781,40 @@ def cmd_config(args: argparse.Namespace) -> int:
         console.print(f"Give these files to IT to install in: {s.managed_dir()}")
     if not personal and any(values for _, values in profiles):
         console.print('Shared files use ${VAR}. Load your values with: eval "$(1xops env)"')
+    return 0
+
+
+def cmd_tenants(args: argparse.Namespace) -> int:
+    """One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing."""
+    root = Path(args.folder)
+    folders = (
+        sorted(p for p in root.iterdir() if p.is_dir() and (p / cf.DEFAULT_FILE).is_file())
+        if root.is_dir()
+        else []
+    )
+    if not folders:
+        print(f"No tenant folders (a folder with its own {cf.DEFAULT_FILE}) under {root}.")
+        return 0
+    cmd = [sys.executable, "-m", "one_xops.cli", "doctor", "--brief", "--within", "8"]
+    runs = [
+        (
+            f,
+            subprocess.Popen(
+                cmd, cwd=f, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            ),
+        )
+        for f in folders
+    ]
+    need = 0
+    for folder, proc in runs:
+        lines = [ln for ln in proc.communicate()[0].splitlines() if ln.strip()]
+        if lines:
+            need += 1
+            more = f" (+{len(lines) - 1} more)" if len(lines) > 1 else ""
+            print(f"✗ {folder.name}: {scrub(lines[0])}{more}")
+        else:
+            print(f"✓ {folder.name}: ready")
+    print(f"{len(folders)} tenants, {need} need attention")
     return 0
 
 
@@ -841,6 +914,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("setup", help="guided setup: asks questions, writes .env.1xops")
     p.add_argument("--file", default=cf.DEFAULT_FILE)
     p.set_defaults(func=wizard.run)
+
+    p = sub.add_parser("tenants", help="status of every tenant folder under a folder")
+    p.add_argument(
+        "folder", nargs="?", default=".", help="the folder that holds the tenant folders"
+    )
+    p.set_defaults(func=cmd_tenants)
 
     p = sub.add_parser("profiles", help="list built-in connector profiles")
     p.set_defaults(func=cmd_profiles)

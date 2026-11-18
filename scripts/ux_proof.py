@@ -33,7 +33,7 @@ TAG = os.environ.get("UX_TAG", "local")  # one image pair per folder (tests/Task
 IMAGES = {"PyPI": f"1xops-ux:py-{TAG}", "npm": f"1xops-ux:js-{TAG}"}
 # Answers a first-time customer gives: a team folder, AWS and Jira, no own profile, write the file, don't apply.
 WIZARD = [
-    ("Scope", "team"), ("Project or tenant folder", "."), ("Add aws", "y"), ("AWS_REGION", "ap-southeast-2"),
+    ("Scope", "team"), ("Tenant folder", "."), ("Add aws", "y"), ("AWS_REGION", "ap-southeast-2"),
     ("Add azure", "n"), ("Add itsm", "y"), ("Your own profile", ""), ("Write", "y"), ("Show every line", "n"),
     ("Apply them now", "n"), ("Connect and verify", "n"),
 ]

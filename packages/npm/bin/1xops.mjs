@@ -19,6 +19,7 @@ const HELP = `Usage: 1xops <command> [options]
   config     write settings and connectors for a scope      [--scope ${SCOPES.join('|')}] [--dir DIR]
                                                              [--out DIR] [--connectors NAME...] [--file PATH] [--yes]
   env        print export lines for the values in ${DEFAULT_FILE}    [--file PATH]
+  tenants    status of every tenant folder under a folder  [FOLDER]
   profiles   list built-in connector profiles
 
 Nothing changes unless you pass --yes.`;
@@ -48,6 +49,7 @@ const OPTIONS = {
   },
   env: { file: { type: 'string', default: DEFAULT_FILE } },
   profiles: {},
+  tenants: {},
 };
 if (!(command in OPTIONS)) {
   console.error(`1xops: unknown command '${command}'\n\n${HELP}`);
@@ -62,7 +64,9 @@ try {
     if (rest[i] !== '--connectors') { expanded.push(rest[i]); continue; }
     while (i + 1 < rest.length && !rest[i + 1].startsWith('--')) expanded.push('--connectors', rest[++i]);
   }
-  opts = parseArgs({ args: expanded, options: OPTIONS[command], strict: true }).values;
+  const parsed = parseArgs({ args: expanded, options: OPTIONS[command], strict: true, allowPositionals: command === 'tenants' });
+  opts = parsed.values;
+  if (command === 'tenants') opts.folder = parsed.positionals[0];
 } catch (err) {
   console.error(`1xops ${command}: ${err.message}`);
   process.exit(2);
@@ -93,6 +97,7 @@ const handlers = {
   setup: () => cmd.setup(opts),
   config: () => cmd.config(opts),
   env: () => cmd.env(opts),
+  tenants: () => cmd.tenants(opts),
   profiles: () => cmd.profiles(),
 };
 process.exit(await handlers[command]());
