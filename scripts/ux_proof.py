@@ -35,7 +35,7 @@ IMAGES = {"PyPI": f"1xops-ux:py-{TAG}", "npm": f"1xops-ux:js-{TAG}"}
 WIZARD = [
     ("Scope", "team"), ("Project or tenant folder", "."), ("Add aws", "y"), ("AWS_REGION", "ap-southeast-2"),
     ("Add azure", "n"), ("Add itsm", "y"), ("Your own profile", ""), ("Write", "y"), ("Show every line", "n"),
-    ("Apply them now", "n"),
+    ("Apply them now", "n"), ("Connect and verify", "n"),
 ]
 RUNS = [  # name, shell command in the container, answers, expected exit codes
     ("doctor-first-run", "1xops doctor", [], {0, 1}),

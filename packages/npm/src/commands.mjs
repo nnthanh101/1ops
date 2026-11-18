@@ -167,7 +167,7 @@ export function azureAccess(roles = []) {
 }
 const AZURE_ACCESS = { read: 'read-only', write: 'can change things: use a read-only (Reader) identity', unknown: 'access unknown: use a read-only (Reader) identity' };
 
-function awsConnector(v, values) {
+export function awsConnector(v, values) {
   const name = `aws ${v}`;
   const profile = values[v] || process.env[v] || '';
   if (!profile) return [name, 'missing', `set ${v} in .env.1xops or the shell (1xops setup)`];
@@ -183,7 +183,7 @@ function awsConnector(v, values) {
   return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(account)}, ${ACCESS[access]}`];
 }
 
-function azureConnector(values = {}) {
+export function azureConnector(values = {}) {
   if (!which('az')) return ['azure', 'missing', 'install the Azure CLI'];
   const who = run('az', ['account', 'show', '--query', 'user.name', '--output', 'tsv']);
   if (who.code !== 0 || !who.out) return ['azure', 'signed out', 'az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR'];
@@ -538,6 +538,18 @@ export function profiles() {
 // ── setup ───────────────────────────────────────────────────────────────────
 
 // Read-only lookups that make good defaults: AWS profiles and region, current Azure account.
+const awsConfigFile = () => process.env.AWS_CONFIG_FILE || join(homedir(), '.aws', 'config');
+const DEFAULTS = { AWS_REGION: 'ap-southeast-2' }; // Sydney; a region is not a secret
+
+// (name, subscription id, tenant id) of the subscriptions the read-only identity in AZURE_CONFIG_DIR can see. Read from its
+// local sign-in, no cloud call. Without AZURE_CONFIG_DIR nothing is read: the default login is never used.
+function azureSubscriptions() {
+  if (!process.env.AZURE_CONFIG_DIR || !which('az')) return [];
+  const r = run('az', ['account', 'list', '--query', '[].{n:name,s:id,t:tenantId}', '--output', 'json']);
+  if (r.code !== 0 || !r.out) return [];
+  try { return JSON.parse(r.out).map((a) => [a.n, a.s, a.t]); } catch { return []; }
+}
+
 function detect() {
   const found = {};
   const ok = (cmd, args) => (which(cmd) ? run(cmd, args) : { code: 1, out: '' });
@@ -560,7 +572,7 @@ function detect() {
 // (name, masked account, role) of AWS profiles whose configured role cannot change things. Read from the local AWS
 // config only: no cloud call. Unknown and can-change profiles are left out.
 export function readOnlyProfiles() {
-  const cfg = process.env.AWS_CONFIG_FILE || join(homedir(), '.aws', 'config');
+  const cfg = awsConfigFile();
   if (!existsSync(cfg)) return [];
   const found = [];
   let name = '';
@@ -615,6 +627,34 @@ export async function setup(opts) {
     const found = detect();
     const connectors = {};
     let listed = false;
+    let azureShown = false;
+    const picked = {};
+    const askSubscription = async () => {
+      const rows = azureSubscriptions();
+      if (!rows.length) {
+        if (!azureShown) {
+          console.log('  No Azure Reader sign-in found. Use a Reader identity in its own folder, never your own login:');
+          console.log('    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again. Or type the ID now.');
+          azureShown = true;
+        }
+        return ask('  AZURE_SUBSCRIPTION_ID (blank to skip)', process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '');
+      }
+      table(`Azure subscriptions of the Reader identity (${rows.length})`, ['#', 'name', 'subscription', 'tenant'], rows.map(([n, s, t], i) => [String(i + 1), n, `****${s.slice(-4)}`, `****${t.slice(-4)}`]));
+      const current = process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '';
+      const cur = rows.findIndex((r) => r[1] === current) + 1;
+      const hint = cur ? `Enter keeps ${cur}, - skips` : 'Enter skips';
+      for (;;) {
+        const pick = (await ask(`  AZURE_SUBSCRIPTION_ID: number or part of a name (${hint})`, cur ? String(cur) : '')).trim();
+        if (!pick || pick === '-') return '';
+        let chosen = /^\d+$/.test(pick) ? rows[Number(pick) - 1] : null;
+        if (!chosen && !/^\d+$/.test(pick)) {
+          const hits = rows.filter((r) => r[0].toLowerCase().includes(pick.toLowerCase()));
+          if (hits.length === 1) [chosen] = hits;
+        }
+        if (chosen) { picked.tenant = chosen[2]; return chosen[1]; }
+        console.log(`  No single subscription matches '${pick}': pick 1 to ${rows.length}.`);
+      }
+    };
     for (const name of s.builtinProfiles()) {
       const profile = s.loadProfile(name);
       if (!(await yes(`Add ${name}: ${profile.description ?? ''}?`, false))) continue;
@@ -626,9 +666,10 @@ export async function setup(opts) {
           const options = readOnlyProfiles();
           if (!options.length) {
             if (!listed) { // say it once, not once per variable
-              console.log('  No read-only AWS profile in ~/.aws/config yet.');
+              console.log(`  No read-only AWS profile in ${awsConfigFile()} yet.`);
               console.log('  Create one with: aws configure sso (a role such as ReadOnlyAccess).');
-              console.log('  Until then /1xops:check shows this connector as missing.');
+              console.log('  Profiles in another file? Run: AWS_CONFIG_FILE=<file> 1xops setup');
+              console.log('  Until then 1xops doctor shows this connector as missing.');
               listed = true;
             }
             continue;
@@ -654,7 +695,18 @@ export async function setup(opts) {
           }
           continue;
         }
-        const value = await ask(`  ${v} (blank to skip)`, process.env[v] || found[v] || '');
+        if (v === 'AZURE_SUBSCRIPTION_ID') {
+          const sub = await askSubscription();
+          if (sub) values[v] = sub;
+          continue;
+        }
+        if (v === 'AZURE_TENANT_ID' && picked.tenant) {
+          console.log('  AZURE_TENANT_ID: taken from the subscription.');
+          values[v] = picked.tenant;
+          continue;
+        }
+        const def = process.env[v] || found[v] || DEFAULTS[v] || '';
+        const value = await ask(def ? `  ${v}` : `  ${v} (blank to skip)`, def);
         if (value) values[v] = value;
       }
       connectors[name] = values;
@@ -673,9 +725,34 @@ export async function setup(opts) {
     console.log('\nChanges this would make:');
     if (config({ file, preview: 'summary' }) !== 0) return 2;
     if (await yes('Show every line first?', false)) config({ file, preview: 'full' });
-    if (await yes('Apply them now?', false)) return config({ file, yes: true });
-    console.log(`Apply later with: 1xops config --file ${file} --yes`);
-    return 0;
+    let code = 0;
+    if (await yes('Apply them now?', false)) code = config({ file, yes: true });
+    else console.log(`Apply later with: 1xops config --file ${file} --yes`);
+    if (code === 0 && Object.keys(connectors).length && (await yes("Connect and verify now? (signs in with each provider's own command)", true))) {
+      console.log('\nConnect: sign in, then check that access is read-only.');
+      const verify = async (label, check, login) => {
+        const show = (row) => console.log(`  ${row[1] === 'ready' ? '✓' : '✗'} ${label}: ${scrub(row[2])}`);
+        let row = check();
+        show(row);
+        if (row[1] === 'signed out' && which(login[0]) && (await yes(`  Sign in now? (${login.join(' ')}; opens your browser)`, true))) {
+          spawnSync(login[0], login.slice(1), { stdio: 'inherit' });
+          row = check();
+          show(row);
+        }
+      };
+      for (const [name, values] of Object.entries(connectors)) {
+        if (name === 'aws') {
+          for (const v of ['AWS_BILLING_PROFILE', 'AWS_OPERATIONS_PROFILE']) {
+            const p = values[v];
+            if (p) await verify(`aws ${v}`, () => awsConnector(v, { [v]: p }), ['aws', 'sso', 'login', '--profile', p]);
+          }
+        } else if (name === 'azure') {
+          if (!process.env.AZURE_CONFIG_DIR) console.log('  azure: use a Reader identity in its own folder (AZURE_CONFIG_DIR), then run setup again.');
+          else await verify('azure', () => azureConnector(values), ['az', 'login']);
+        } else if (name === 'itsm') console.log('  itsm: sign in inside the assistant: start it in this folder, run /mcp and choose atlassian.');
+      }
+    }
+    return code;
   } finally {
     rl.close();
   }
