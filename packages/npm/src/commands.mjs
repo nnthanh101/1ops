@@ -553,6 +553,8 @@ export function config(opts) {
 
 const shellQuote = (v) => (/^[A-Za-z0-9@%+=:,./_-]+$/.test(v) ? v : `'${v.replaceAll("'", `'"'"'`)}'`);
 
+const TENANTS_AT_ONCE = 8; // each check signs in to AWS and Azure: a limit keeps 200 tenants from 400 sign-ins at once
+
 // One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing.
 export async function tenants(opts) {
   const root = opts.folder ?? '.';
@@ -562,20 +564,25 @@ export async function tenants(opts) {
   } catch { /* not a folder */ }
   if (!folders.length) { console.log(`No tenant folders (a folder with its own ${cf.DEFAULT_FILE}) under ${root}.`); return 0; }
   const bin = join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', '1xops.mjs');
-  const results = await Promise.all(folders.map((name) => new Promise((resolve) => {
+  const check = (name) => new Promise((resolve) => {
     const child = spawn(process.execPath, [bin, 'doctor', '--brief', '--within', '8'], { cwd: join(root, name) });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    child.on('close', () => resolve([name, out.split('\n').filter((l) => l.trim())]));
-  })));
+    child.on('close', (code) => resolve([name, code ?? 1, out.split('\n').filter((l) => l.trim())]));
+  });
+  const results = new Array(folders.length);
+  let next = 0;
+  const worker = async () => { while (next < folders.length) { const i = next++; results[i] = await check(folders[i]); } };
+  await Promise.all(Array.from({ length: Math.min(TENANTS_AT_ONCE, folders.length) }, worker));
   let need = 0;
-  for (const [name, lines] of results) {
-    if (lines.length) { need += 1; console.log(`✗ ${name}: ${scrub(lines[0])}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}`); }
+  for (const [name, code, lines] of results) {
+    if (code !== 0) { need += 1; console.log(`✗ ${name}: the check failed (exit ${code}): ${lines.length ? scrub(lines.at(-1)) : 'no output'}`); }
+    else if (lines.length) { need += 1; console.log(`✗ ${name}: ${scrub(lines[0])}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}`); }
     else console.log(`✓ ${name}: ready`);
   }
   console.log(`${folders.length} tenants, ${need} need attention`);
-  return 0;
+  return need ? 1 : 0;
 }
 
 export function env(opts) {
@@ -586,7 +593,10 @@ export function env(opts) {
     console.error(err.message);
     return 2;
   }
-  for (const [k, v] of Object.entries(cfg.values)) console.log(`export ${k}=${shellQuote(v)}`);
+  for (const [k, v] of Object.entries(cfg.values)) {
+    const value = v === '~' || v.startsWith('~/') ? homedir() + v.slice(1) : v;
+    console.log(`export ${k}=${shellQuote(value)}`);
+  }
   return 0;
 }
 

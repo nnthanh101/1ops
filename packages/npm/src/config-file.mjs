@@ -93,7 +93,11 @@ export function load(file) {
   const scope = pairs.ONEXOPS_SCOPE ?? 'team';
   if (!SCOPES.includes(scope)) throw new Error(`${file}: ONEXOPS_SCOPE must be one of ${SCOPES.join(', ')}`);
   const values = Object.fromEntries(Object.entries(pairs).filter(([k]) => !OWN.has(k)));
-  const names = (pairs.ONEXOPS_CONNECTORS ?? '').split(',').map((c) => c.trim()).filter(Boolean);
+  // your own profile file is read from this file's folder, wherever 1xops runs
+  const here = dirname(resolve(file));
+  const home = (n) => (n === '~' || n.startsWith('~/') ? homedir() + n.slice(1) : n);
+  const names = (pairs.ONEXOPS_CONNECTORS ?? '').split(',').map((c) => c.trim()).filter(Boolean)
+    .map((n) => (n.endsWith('.json') ? resolve(here, home(n)) : n));
   return {
     scope,
     dir: pairs.ONEXOPS_DIR ?? '.',

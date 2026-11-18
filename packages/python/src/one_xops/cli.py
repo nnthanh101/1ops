@@ -819,6 +819,11 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+TENANTS_AT_ONCE = (
+    8  # each check signs in to AWS and Azure: a limit keeps 200 tenants from 400 sign-ins at once
+)
+
+
 def cmd_tenants(args: argparse.Namespace) -> int:
     """One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing."""
     root = Path(args.folder)
@@ -830,27 +835,37 @@ def cmd_tenants(args: argparse.Namespace) -> int:
     if not folders:
         print(f"No tenant folders (a folder with its own {cf.DEFAULT_FILE}) under {root}.")
         return 0
+    from concurrent.futures import ThreadPoolExecutor
+
     cmd = [sys.executable, "-P", "-m", "one_xops.cli", "doctor", "--brief", "--within", "8"]
-    runs = [
-        (
-            f,
-            subprocess.Popen(
-                cmd, cwd=f, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            ),
+
+    def check(folder: Path) -> tuple[int, list[str]]:
+        p = subprocess.run(
+            cmd,
+            cwd=folder,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
         )
-        for f in folders
-    ]
+        return p.returncode, [ln for ln in p.stdout.splitlines() if ln.strip()]
+
+    with ThreadPoolExecutor(max_workers=TENANTS_AT_ONCE) as pool:
+        results = list(pool.map(check, folders))
     need = 0
-    for folder, proc in runs:
-        lines = [ln for ln in proc.communicate()[0].splitlines() if ln.strip()]
-        if lines:
+    for folder, (code, lines) in zip(folders, results, strict=True):
+        if code != 0:
+            need += 1
+            first = scrub(lines[-1]) if lines else "no output"
+            print(f"✗ {folder.name}: the check failed (exit {code}): {first}")
+        elif lines:
             need += 1
             more = f" (+{len(lines) - 1} more)" if len(lines) > 1 else ""
             print(f"✗ {folder.name}: {scrub(lines[0])}{more}")
         else:
             print(f"✓ {folder.name}: ready")
     print(f"{len(folders)} tenants, {need} need attention")
-    return 0
+    return 1 if need else 0
 
 
 def cmd_env(args: argparse.Namespace) -> int:
@@ -861,6 +876,8 @@ def cmd_env(args: argparse.Namespace) -> int:
         print(exc, file=sys.stderr)
         return 2
     for key, value in cfg["values"].items():
+        if value == "~" or value.startswith("~/"):
+            value = os.path.expanduser(value)
         print(f"export {key}={shlex.quote(value)}")
     return 0
 

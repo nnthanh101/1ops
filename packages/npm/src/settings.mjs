@@ -30,7 +30,8 @@ export function mcpPath(scope, project, out) {
 }
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// One text per value, whatever the key order: the same rule as the Python package.
+const canon = (v) => JSON.stringify(v, (_, x) => (isObject(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
 
 // Add incoming keys without overwriting anything the user already set:
 // objects merge recursively, arrays gain only missing items, existing scalars win.
@@ -40,7 +41,8 @@ export function merge(existing, incoming) {
     if (!(key in out)) out[key] = value;
     else if (isObject(out[key]) && isObject(value)) out[key] = merge(out[key], value);
     else if (Array.isArray(out[key]) && Array.isArray(value)) {
-      out[key] = [...out[key], ...value.filter((v) => !out[key].some((o) => same(o, v)))];
+      const have = new Set(out[key].map(canon));
+      out[key] = [...out[key], ...value.filter((v) => !have.has(canon(v)))];
     }
   }
   return out;

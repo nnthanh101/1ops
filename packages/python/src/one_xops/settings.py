@@ -69,6 +69,11 @@ def mcp_path(scope: str, project: Path, out: Path | None = None) -> Path | None:
     return None
 
 
+def _canon(value) -> str:
+    """One text per value, whatever the key order: the same rule as the Node.js package."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
 def merge(existing: dict, incoming: dict) -> dict:
     """Add incoming keys without overwriting anything the user already set.
 
@@ -81,7 +86,8 @@ def merge(existing: dict, incoming: dict) -> dict:
         elif isinstance(out[key], dict) and isinstance(value, dict):
             out[key] = merge(out[key], value)
         elif isinstance(out[key], list) and isinstance(value, list):
-            out[key] = out[key] + [v for v in value if v not in out[key]]
+            have = {_canon(v) for v in out[key]}
+            out[key] = out[key] + [v for v in value if _canon(v) not in have]
     return out
 
 

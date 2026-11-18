@@ -15,6 +15,7 @@ Every other KEY=value line is a value for the ${KEY} references in the connector
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -136,6 +137,12 @@ def load(path: Path) -> dict:
         raise ValueError(f"{path}: ONEXOPS_SCOPE must be one of {', '.join(s.SCOPES)}")
     values = {k: v for k, v in pairs.items() if k not in OWN}
     names = [c.strip() for c in pairs.get("ONEXOPS_CONNECTORS", "").split(",") if c.strip()]
+    # your own profile file is read from this file's folder, wherever 1xops runs
+    here = os.path.dirname(os.path.abspath(path))
+    names = [
+        os.path.normpath(os.path.join(here, os.path.expanduser(n))) if n.endswith(".json") else n
+        for n in names
+    ]
     return {
         "scope": scope,
         "dir": pairs.get("ONEXOPS_DIR", "."),
