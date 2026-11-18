@@ -2,3 +2,4 @@
 	path = upstream/knowledge-work-plugins
 	url = https://github.com/anthropics/knowledge-work-plugins.git
 	branch = main
+	ignore = untracked
