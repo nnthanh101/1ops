@@ -30,14 +30,13 @@ dev = ["pytest>=9.2", "ruff>=0.17"]
 requires = ["hatchling>=1.33"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build]
-artifacts = ["src/one_xops/templates/settings/*.json"]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/one_xops"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/one_xops", "tests", "README.md"]
+include = ["src/one_xops", "tests", "README.md", "hatch_build.py"]
+
+[tool.hatch.build.hooks.custom]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
