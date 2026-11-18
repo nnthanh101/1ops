@@ -12,6 +12,7 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 const HELP = `Usage: 1xops <command> [options]
 
   doctor     check prerequisites, sign-in and connectors    [--aws-profile NAME] [--file PATH]
+                                                             [--brief] [--hook] [--within SECONDS]
   install    add the marketplaces and install the plugin    [--scope user|project|local] [--edition free|enterprise]
                                                              [--file BUNDLE] [--yes]
   setup      guided setup: asks questions, writes ${DEFAULT_FILE}   [--file PATH]
@@ -34,7 +35,7 @@ if (!command || command === '--help' || command === '-h') {
 }
 
 const OPTIONS = {
-  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE } },
+  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE }, brief: { type: 'boolean', default: false }, hook: { type: 'boolean', default: false }, within: { type: 'string' } },
   install: { scope: { type: 'string', default: 'user' }, edition: { type: 'string', default: 'free' }, file: { type: 'string' }, yes: { type: 'boolean', default: false } },
   setup: { file: { type: 'string', default: DEFAULT_FILE } },
   config: {
@@ -65,6 +66,13 @@ try {
 } catch (err) {
   console.error(`1xops ${command}: ${err.message}`);
   process.exit(2);
+}
+if (command === 'doctor' && opts.within !== undefined) {
+  opts.within = Number(opts.within);
+  if (!(opts.within >= 0)) {
+    console.error('1xops doctor: --within must be a number of seconds');
+    process.exit(2);
+  }
 }
 if (command === 'config' && !SCOPES.includes(opts.scope)) {
   console.error(`1xops config: --scope must be one of ${SCOPES.join(', ')}`);

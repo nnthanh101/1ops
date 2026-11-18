@@ -1,65 +1,24 @@
-# Taskfile.yml - type `task` to see this list.
-#
-#   Customer
-#     task doctor                          am I ready? tools, sign-in, read-only access (account IDs masked)
-#     task setup                           guided setup; shows every change before it is made
-#     task config [YES=1]                  apply my settings (a preview unless YES=1)
-#   Owner and leadership
-#     task status                          what customers can install today, each story's proof, product health
-#     task release [BUMP=minor|major] STORY=n  ship latest published + 1 (patch by default) and prove it: one approval
-#   Engineer
-#     task test                            quick tests
-#     task gate                            local first: lint, tests, act, image, ux - before saying done, committing, releasing
-#     task ux                              every command in a real terminal as a first-time customer: checks + screenshots
-#     task ci                              the full check, as it runs on GitHub
+# 1xops tasks. Type `task`: it shows what needs attention now, then this list. `task --summary <name>` gives the business value and a real scenario.
+#   👤 Customer   tasks/customer.yml   doctor · setup · config
+#   🔑 Owner      tasks/owner.yml      status · release
+#   🔧 Engineer   tests/Taskfile.yml   test · lint · image · ux · ci · gate
 version: '3'
 
 includes:
-  tests:
-    taskfile: ./tests/Taskfile.yml
-    flatten: true   # task gate, task ux, task lint, task image
-
-vars:
-  PY: uv run --project packages/python 1xops
+  customer: {taskfile: ./tasks/customer.yml, dir: ., flatten: true}
+  owner:    {taskfile: ./tasks/owner.yml, dir: ., flatten: true}
+  tests:    {taskfile: ./tests/Taskfile.yml, flatten: true}
 
 tasks:
+  # Business value: minutes saved at the start of an incident (story 1XOPS-009, issue #38).
+  # Scenario: at 2 a.m. the on-call engineer's AWS connector is signed out; `task` names it with the fix. Stops after 4 s; change: task WITHIN=10
   default:
-    cmds: [task --list]
     silent: true
-
-  doctor:
-    desc: 'Am I ready? Tools, sign-in, read-only access (account IDs masked)'
-    cmds: ['{{.PY}} doctor']
-
-  setup:
-    desc: 'Guided setup: writes .env.1xops and shows every change before it is made'
-    interactive: true
-    cmds: ['{{.PY}} setup']
-
-  config:
-    desc: Apply my settings; a preview unless YES=1
-    cmds: ['{{.PY}} config --file .env.1xops {{if .YES}}--yes{{end}}']
-    preconditions:
-      - sh: test -f .env.1xops
-        msg: 'No .env.1xops here: run task setup first'
-
-  status:
-    desc: What customers can install today, each story's proof, product health
-    cmds: [bash scripts/status.sh]
-
-  release:
-    desc: 'Owner only: ship the next version (or VERSION); task gate first, then publish, then prove each channel (proof stays in tmp/)'
-    interactive: true
-    cmds: ['BUMP={{.BUMP}} VERSION={{.VERSION}} STORY={{.STORY}} bash scripts/release.sh']
-
-  test:
-    desc: Quick tests
     cmds:
-      - uv run --project packages/python --group dev pytest -q packages/python/tests
-      - npm test --prefix packages/npm --silent
-      # Python and Node.js print the same bytes, on this machine's real tools (a check that printed nothing fails)
-      - mkdir -p tmp && uv run -q --project packages/python 1xops doctor >tmp/doctor-py.txt 2>&1; echo "exit $?" >>tmp/doctor-py.txt; node packages/npm/bin/1xops.mjs doctor >tmp/doctor-js.txt 2>&1; echo "exit $?" >>tmp/doctor-js.txt; test "$(wc -l <tmp/doctor-py.txt)" -gt 2 && cmp tmp/doctor-py.txt tmp/doctor-js.txt
-
-  ci:
-    desc: The full check, as it runs on GitHub
-    cmds: [act pull_request -W .github/workflows/release.yml --rm]
+      - |
+        if [ ! -f .env.1xops ]; then echo "👉 No .env.1xops here. Run: task setup"; else
+          out=$(uv run --project packages/python 1xops doctor --brief --within {{.WITHIN | default "4"}})
+          if [ -n "$out" ]; then echo "🔔 Needs attention:"; echo "$out"; else echo "✅ All connectors ready"; fi
+        fi
+      - echo
+      - task --list

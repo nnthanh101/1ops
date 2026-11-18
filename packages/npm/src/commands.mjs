@@ -24,8 +24,18 @@ export function which(cmd) {
   return null;
 }
 
+export class OutOfTime extends Error {}
+let deadline = null; // set only while a session-start check runs
+
 export function run(cmd, args, timeout = 20000) {
-  const p = spawnSync(cmd, args, { encoding: 'utf8', timeout });
+  let limit = timeout;
+  if (deadline !== null) { // each call gets only the time that is left
+    const left = deadline - Date.now();
+    if (left <= 0) throw new OutOfTime();
+    limit = Math.min(timeout, left);
+  }
+  const p = spawnSync(cmd, args, { encoding: 'utf8', timeout: limit });
+  if (p.error?.code === 'ETIMEDOUT' && limit < timeout) throw new OutOfTime();
   if (p.error) return { code: 1, out: String(p.error.message) };
   return { code: p.status ?? 1, out: (p.stdout || p.stderr || '').trim() };
 }
@@ -166,14 +176,25 @@ function awsConnector(v, values) {
   if (code !== 0) return [name, ...awsFix(out, profile)];
   let id;
   try { id = JSON.parse(out); } catch { return [name, 'check', 'AWS identity call returned no account']; }
+  const account = id.Account ?? '';
+  const expected = v.endsWith('_PROFILE') ? values[v.replace('_PROFILE', '_ACCOUNT')] || '' : '';
+  if (expected && account !== expected) return [name, 'wrong account', `profile ${profile} is ${mask(account)}, this tenant expects ${mask(expected)}: aws configure sso --profile ${profile}`];
   const access = accessFromRole(id.Arn ?? '');
-  return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(id.Account ?? '')}, ${ACCESS[access]}`];
+  return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(account)}, ${ACCESS[access]}`];
 }
 
-function azureConnector() {
+function azureConnector(values = {}) {
   if (!which('az')) return ['azure', 'missing', 'install the Azure CLI'];
   const who = run('az', ['account', 'show', '--query', 'user.name', '--output', 'tsv']);
   if (who.code !== 0 || !who.out) return ['azure', 'signed out', 'az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR'];
+  const wantTenant = values.AZURE_TENANT_ID || '';
+  const wantSub = values.AZURE_SUBSCRIPTION_ID || '';
+  if (wantTenant || wantSub) {
+    const ids = run('az', ['account', 'show', '--query', '[tenantId,id]', '--output', 'tsv']);
+    const [tenant = '', sub = ''] = ids.code === 0 ? ids.out.split('\t') : [];
+    if (wantTenant && tenant && tenant !== wantTenant) return ['azure', 'wrong account', `tenant is ${mask(tenant)}, this tenant expects ${mask(wantTenant)}: az login --tenant <AZURE_TENANT_ID>`];
+    if (wantSub && sub && sub !== wantSub) return ['azure', 'wrong account', `subscription is ${mask(sub)}, this tenant expects ${mask(wantSub)}: az account set --subscription <AZURE_SUBSCRIPTION_ID>`];
+  }
   const roles = run('az', ['role', 'assignment', 'list', '--assignee', who.out, '--all', '--query', '[].roleDefinitionName', '--output', 'json'], 60000);
   let names = [];
   try { names = roles.code === 0 ? JSON.parse(roles.out) : []; } catch { /* not JSON */ }
@@ -182,12 +203,12 @@ function azureConnector() {
 }
 
 // [connector, status, fix] for each connector in .env.1xops. Read-only identity calls only.
-export function checkConnectors(file) {
-  if (!existsSync(file)) return [['connectors', 'missing', `no ${file} here: run 1xops setup`]];
+// Rows are added to `rows` as they are found, so a check that runs out of time keeps what it has.
+export function checkConnectors(file, rows = []) {
+  if (!existsSync(file)) { rows.push(['connectors', 'missing', `no ${file} here: run 1xops setup`]); return rows; }
   let cfg;
-  try { cfg = cf.load(file); } catch (err) { return [['connectors', 'missing', err.message]]; }
-  if (!Object.keys(cfg.connectors).length) return [['connectors', 'missing', `ONEXOPS_CONNECTORS is empty in ${file}: run 1xops setup`]];
-  const rows = [];
+  try { cfg = cf.load(file); } catch (err) { rows.push(['connectors', 'missing', err.message]); return rows; }
+  if (!Object.keys(cfg.connectors).length) { rows.push(['connectors', 'missing', `ONEXOPS_CONNECTORS is empty in ${file}: run 1xops setup`]); return rows; }
   for (const connector of Object.keys(cfg.connectors)) {
     let servers;
     try { servers = s.loadProfile(connector).mcpServers; } catch (err) { rows.push([connector, 'missing', err.message]); continue; }
@@ -200,25 +221,95 @@ export function checkConnectors(file) {
       else if (server.type === 'http') rows.push([serverName, 'check', `signs in inside the host: run /mcp and choose ${serverName}`]);
       else rows.push([serverName, 'check', 'no sign-in check for this connector']);
     }
-    rows.push(...[...new Set(awsVars)].map((v) => awsConnector(v, cfg.values)));
-    if (azure) rows.push(azureConnector());
+    for (const v of new Set(awsVars)) rows.push(awsConnector(v, cfg.values));
+    if (azure) rows.push(azureConnector(cfg.values));
   }
   return rows;
 }
 
-const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow' };
+const ENV_FIX = 'in .env.1xops, then start the assistant from a shell that ran eval "$(1xops env)"';
+
+// [server (plugin), status, fix] for the servers of the installed 1xops plugin and of the operations plugin it
+// depends on, from the host's own plugin records. Reads no token, makes no call.
+export function pluginConnectors() {
+  const folder = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(homedir(), `.${s.HOST}`), 'plugins');
+  let installed;
+  try { installed = JSON.parse(readFileSync(path.join(folder, 'installed_plugins.json'), 'utf8')).plugins ?? {}; } catch { return []; }
+  const rows = [];
+  for (const [key, entries] of Object.entries(installed)) {
+    const plugin = key.split('@')[0];
+    if (plugin !== '1xops' && key !== 'operations@knowledge-work-plugins') continue;
+    let servers;
+    try {
+      const data = JSON.parse(readFileSync(path.join(entries[0].installPath, '.mcp.json'), 'utf8'));
+      servers = Object.entries(data.mcpServers ?? data);
+    } catch { continue; }
+    for (const [name, server] of servers) {
+      if (typeof server !== 'object' || server === null || Array.isArray(server)) continue;
+      const label = `${name} (${plugin})`;
+      const unset = [...new Set([...JSON.stringify(server).matchAll(/\$\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]))].filter((v) => !v.startsWith('CLAUDE_') && !process.env[v]);
+      if (unset.length) rows.push([label, 'broken', `${unset.join(', ')} not set. Fix: put ${unset.map((v) => `${v}=<value>`).join(', ')} ${ENV_FIX}`]);
+      else if ('url' in server && !String(server.url).trim()) rows.push([label, 'not connected', "no server. Fix: connect it in the assistant's connector settings, or list it in ONEXOPS_IGNORE in .env.1xops"]);
+      else rows.push([label, 'in host', `signs in inside the host: run /mcp and choose ${name}`]);
+    }
+  }
+  return rows;
+}
+
+// The tenant's connectors and the plugin servers, minus the names in ONEXOPS_IGNORE.
+export function connectorRows(file, rows) {
+  let values = {};
+  try { values = cf.load(file).values; } catch { /* no file: nothing to ignore */ }
+  const ignore = new Set((values.ONEXOPS_IGNORE ?? '').split(',').map((n) => n.trim()).filter(Boolean));
+  try {
+    rows.push(...pluginConnectors());
+    checkConnectors(file, rows);
+  } finally {
+    const keep = rows.filter((r) => !ignore.has(r[0]) && !ignore.has(r[0].split(' (')[0]));
+    rows.length = 0;
+    rows.push(...keep);
+  }
+  return rows;
+}
+
+const SKIP_AT_START = ['ready', 'in host'];
+const QUIET = ['signs in inside the host', 'no sign-in check'];
+
+// Session start: one line per connector that is not ready, with its fix. Nothing when all is ready.
+// Never throws; a check that runs out of time or fails adds one line saying so.
+export function briefText(file, within) {
+  const rows = [];
+  let done = true;
+  deadline = within == null ? null : Date.now() + within * 1000;
+  try {
+    if (existsSync(file)) connectorRows(file, rows); // not a tenant folder: nothing to say
+  } catch { done = false; } finally { deadline = null; }
+  const lines = rows.filter(([, status, fix]) => !SKIP_AT_START.includes(status) && !QUIET.some((q) => fix.startsWith(q))).map(([name, , fix]) => `${name}: ${scrub(fix)}`);
+  if (!done) lines.push(`1xops: the check did not finish${within == null ? '' : ` in ${within} s`}; run 1xops doctor for the rest.`);
+  return lines.join('\n');
+}
+
+function brief(opts) {
+  const text = briefText(opts.file, opts.within);
+  if (text && opts.hook) console.log(JSON.stringify({ systemMessage: text, hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } }));
+  else if (text) console.log(text);
+  return 0;
+}
+
+const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow', broken: 'red', 'not connected': 'yellow', 'wrong account': 'red', 'in host': 'dim' };
 
 export function doctor(opts, version) {
+  if (opts.brief || opts.hook) return brief(opts);
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
   const rows = [...checkTools(), checkEdition(), ...checkSignIn(opts['aws-profile'])];
-  const connectors = checkConnectors(opts.file);
+  const connectors = connectorRows(opts.file, []);
   if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
   shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
   // Required tools and configured connectors that are not ok or ready. Optional tools stay in the table only.
-  const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[1] !== 'optional');
+  const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[2] !== 'in host' && r[1] !== 'optional');
   for (const r of shown) r[2] = color(RESULT_STYLE[r[2]], r[2]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
   // What to do next, in table order (see todo above).

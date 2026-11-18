@@ -12,6 +12,7 @@ const VAR = /\$\{([A-Z0-9_]+)(?::-[^}]*)?\}/g;
 const KEY = /^[A-Z_][A-Z0-9_]*$/;
 const SECRET_HINTS = ['TOKEN', 'SECRET', 'PASSWORD', 'API_KEY'];
 const OWN = new Set(['ONEXOPS_SCOPE', 'ONEXOPS_DIR', 'ONEXOPS_OUT', 'ONEXOPS_CONNECTORS']);
+const KNOWN = new Set([...OWN, 'ONEXOPS_IGNORE']); // IGNORE stays among the values: doctor reads it
 
 // Every ${VAR} a profile's servers read, in order of first use.
 export function variables(profile) {
@@ -50,8 +51,8 @@ export function parse(text, where = '.env') {
 export function load(file) {
   const pairs = parse(readFileSync(file, 'utf8'), file);
   for (const key of Object.keys(pairs)) {
-    if (key.startsWith('ONEXOPS_') && !OWN.has(key)) {
-      throw new Error(`${file}: unknown setting ${key}; use one of ${[...OWN].sort().join(', ')}`);
+    if (key.startsWith('ONEXOPS_') && !KNOWN.has(key)) {
+      throw new Error(`${file}: unknown setting ${key}; use one of ${[...KNOWN].sort().join(', ')}`);
     }
     if (SECRET_HINTS.some((h) => key.includes(h))) {
       throw new Error(`${file}: ${key} looks like a secret; keep it in your keychain or sign-in, not in this file`);

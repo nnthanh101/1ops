@@ -6,6 +6,8 @@
     ONEXOPS_CONNECTORS=aws,itsm        # built-in profiles, or paths to your own .json profiles
     AWS_OPERATIONS_PROFILE=ops-readonly
     AWS_REGION=ap-southeast-2
+    AWS_OPERATIONS_ACCOUNT=123456789012   # optional: the account this tenant expects, else doctor names a wrong one
+    ONEXOPS_IGNORE=gmail,google calendar  # optional: connectors the session start never names
 
 Every other KEY=value line is a value for the ${KEY} references in the connector profiles
 (see `1xops profiles`). Plain KEY=value, so the shell, Python and Node.js all read it natively.
@@ -23,6 +25,7 @@ VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-[^}]*)?\}")
 KEY = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 SECRET_HINTS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY")
 OWN = {"ONEXOPS_SCOPE", "ONEXOPS_DIR", "ONEXOPS_OUT", "ONEXOPS_CONNECTORS"}
+KNOWN = OWN | {"ONEXOPS_IGNORE"}  # IGNORE stays among the values: doctor reads it
 
 
 def variables(profile: dict) -> list[str]:
@@ -65,8 +68,10 @@ def load(path: Path) -> dict:
     """Read and check .env.1xops. Returns {scope, dir, out, connectors: {name: values}, values}."""
     pairs = parse(path.read_text(), str(path))
     for key in pairs:
-        if key.startswith("ONEXOPS_") and key not in OWN:
-            raise ValueError(f"{path}: unknown setting {key}; use one of {', '.join(sorted(OWN))}")
+        if key.startswith("ONEXOPS_") and key not in KNOWN:
+            raise ValueError(
+                f"{path}: unknown setting {key}; use one of {', '.join(sorted(KNOWN))}"
+            )
         if any(h in key for h in SECRET_HINTS):
             raise ValueError(
                 f"{path}: {key} looks like a secret; keep it in your keychain or sign-in, "

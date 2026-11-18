@@ -21,8 +21,9 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 
 ## Commands: one namespace
 Every command and skill is `/1xops:<name>`, free or enterprise; `<name>` is the outcome in kebab-case, never the edition,
-vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` only. Everything else lives
-in the same-named `1xops` plugin in the private `1xOps/1xops-enterprise` repository. Marketplaces: free `1ops` (`1xops@1ops`), enterprise `1xops` (`1xops@1xops`). Table: `plugins/1xops/README.md`.
+vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` and the skills `tenant-setup`, `change-request`, `vendor-review`, `process-doc`,
+`capacity-plan`, `compliance-tracking`. The enterprise edition carries these unchanged, plus everything else, in the same-named
+`1xops` plugin in the private `1xOps/1xops-enterprise` repository. Marketplaces: free `1ops` (`1xops@1ops`), enterprise `1xops` (`1xops@1xops`). Table: `plugins/1xops/README.md`.
 
 ## Release standard
 SemVer, tag `vX.Y.Z`, one version for PyPI, npm and the image. Next version = latest published + 1:
