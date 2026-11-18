@@ -19,7 +19,7 @@ Four real files, one per scope. `1xops setup` asks for the scope (default `team`
 | **Browser and computer automation: observe** (screenshot, read page, snapshot) | allow | allow | allow | allow |
 | **Browser and computer automation: act** (click, type, navigate, upload, run script) | ask | ask | ask | ask |
 | **Browser: run arbitrary code** (Playwright `run_code_unsafe`) | deny | deny | deny | deny |
-| **Credentials** (`.env`, `~/.aws`, `~/.azure`, `~/.ssh`) | deny | deny `.env`, ask the rest | same as team | deny `.env`, ask the rest |
+| **Credentials** (`.env`, `~/.aws`, `~/.azure`, `~/.azure-reader`, `~/.config/gh`, `~/.ssh`) | deny | deny `.env`, ask the rest | same as team | deny `.env`, ask the rest |
 | **Publishing** (`npm publish`, `uv publish`) | deny | deny | deny | not set |
 | **Git writes** (commit, push, merge, tag, reset --hard, new branch) | ask | ask | ask | not set |
 | **Force-push, push to `main`** | deny | ask | ask | not set |

@@ -118,7 +118,16 @@ def load_profile(name_or_path: str) -> dict:
 def read_json(path: Path) -> dict:
     if not path.exists() or not path.read_text().strip():
         return {}
-    return json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        raise ValueError(  # noqa: TRY004 - the callers report ValueError as a plain message
+            f"{path} is not a valid settings file (JSON object). "
+            f"Fix it, or rename it and run again; nothing was changed"
+        )
+    return data
 
 
 def dumps(data: dict) -> str:
@@ -126,8 +135,14 @@ def dumps(data: dict) -> str:
 
 
 def write(path: Path, text: str) -> None:
-    """Write through a temp file, flushed to disk, then swap it in: never a half-written file."""
+    """Write through a temp file, flushed to disk, then swap it in: never a half-written file.
+    The same content writes nothing; a change keeps the previous file as <name>.bak."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        old = path.read_bytes()
+        if old == text.encode():
+            return
+        path.with_name(path.name + ".bak").write_bytes(old)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with tmp.open("w") as f:
         f.write(text)

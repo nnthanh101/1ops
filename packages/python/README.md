@@ -6,7 +6,7 @@ Command line for [1xops by OceanSoft.io](https://github.com/nnthanh101/1xops): c
 uvx 1xops doctor                       # prerequisites and read-only sign-in (account IDs masked)
 uvx 1xops install --yes                # add the marketplaces and install the plugin
 uvx 1xops setup                        # guided: asks a few questions, writes .env.1xops, shows the diff
-uvx 1xops profiles                     # built-in connector profiles: aws, azure, itsm
+uvx 1xops connectors                   # built-in connectors: aws, azure, itsm
 uvx 1xops config --scope team --connectors aws itsm          # shows a diff
 uvx 1xops config --scope team --connectors aws itsm --yes    # writes it
 ```
@@ -25,7 +25,7 @@ One plain `KEY=value` file holds everything a person or team sets: non-secret va
 ```bash
 ONEXOPS_SCOPE=team                 # org | team | local | personal
 ONEXOPS_DIR=.                      # project or tenant folder (team, local)
-ONEXOPS_CONNECTORS=aws,itsm        # built-in profiles, or paths to your own .json profiles
+ONEXOPS_CONNECTORS=aws,itsm        # built-in connectors, or paths to your own .json files
 AWS_OPERATIONS_PROFILE=ops-readonly
 AWS_REGION=ap-southeast-2
 ```
@@ -35,7 +35,7 @@ AWS_REGION=ap-southeast-2
 eval "$(1xops env)"                     # team/org: load your values into the shell
 ```
 
-- Every other `KEY` is the `${KEY}` a profile uses; `1xops profiles` lists them.
+- Every other `KEY` is the `${KEY}` a profile uses; `1xops connectors` lists them.
 - At `team` and `org` scope the shared files keep `${VAR}`, so profile names and tenant IDs never reach git. The host reads these from your shell environment, so run `1xops env`.
 - At `local` and `personal` scope the values are written into your private host configuration.
 - Keys that look like secrets (`TOKEN`, `SECRET`, `PASSWORD`, `API_KEY`) and unknown `ONEXOPS_` settings are refused.
@@ -45,7 +45,7 @@ eval "$(1xops env)"                     # team/org: load your values into the sh
 
 - Nothing changes without `--yes`.
 - Existing values are never overwritten; only missing entries are added.
-- Built-in profiles pin every server version and use `${VAR}` references for profiles, tokens and URLs, so no secret is written to a file.
+- Built-in connectors pin every server version and use `${VAR}` references for profiles, tokens and URLs, so no secret is written to a file.
 - Your own profile is a JSON file with an `mcpServers` object: `--connectors ./my-profile.json`.
 
 Licence: Apache-2.0. © 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io. Licence, trademarks and third-party components: [NOTICE](https://github.com/nnthanh101/1xops/blob/develop/NOTICE).

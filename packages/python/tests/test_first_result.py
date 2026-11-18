@@ -162,6 +162,7 @@ def test_empty_and_refused_settings_say_missing_with_the_reason(shims):
 
 READ_ONLY_CALLS = (
     "aws sts get-caller-identity ",
+    "aws configure get ",  # local config, no call to AWS
     "az account show ",
     "az role assignment list ",
 )

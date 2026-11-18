@@ -6,6 +6,8 @@ Nothing is changed unless you pass --yes; without it each command shows what it 
 from __future__ import annotations
 
 import argparse
+import configparser
+import hashlib
 import json
 import os
 import re
@@ -14,6 +16,9 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from rich.console import Console
@@ -112,9 +117,17 @@ def _mask(account: str) -> str:
     return f"****{account[-4:]}" if len(account) >= 4 else "****"
 
 
+GUID = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
+ACCOUNT_ID = re.compile(r"(?<!\d)(?<!\d\.)\d{12}(?!\d|\.\d)")
+
+
 def scrub(text: str) -> str:
-    """Any 12-digit run (an AWS account ID), masked: doctor output is pasted onto issues as evidence."""
-    return re.sub(r"\d{12}", lambda m: _mask(m.group(0)), str(text))
+    """An AWS account ID (exactly 12 digits, not part of a longer number or a decimal) and an Azure ID, masked:
+    doctor output is pasted onto issues as evidence."""
+    text = GUID.sub(lambda m: _mask(m.group(0)), str(text))
+    return ACCOUNT_ID.sub(lambda m: _mask(m.group(0)), text)
 
 
 def access_from_role(arn: str = "") -> str:
@@ -301,7 +314,59 @@ def _aws_connector(var: str, values: dict[str, str]) -> tuple[str, str, str]:
         )
     access = access_from_role(ident.get("Arn", ""))
     detail = f"profile {profile}, account {_mask(account)}, {ACCESS[access]}"
+    if long_lived_key(profile):
+        return (
+            name,
+            "check",
+            f"{detail}; long-lived access key: use SSO, aws configure sso --profile {profile}",
+        )
+    end = sso_end(profile)
+    if end:
+        SIGN_IN_ENDS[name] = (end, f"aws sso login --profile {profile}")
+        detail += f", signed in until {end:%Y-%m-%d %H:%M} UTC"
     return name, "ready" if access == "read" else "check", detail
+
+
+SIGN_IN_ENDS: dict[
+    str, tuple[datetime, str]
+] = {}  # connector: (when its sign-in ends, the sign-in command)
+
+
+def sso_end(profile: str) -> datetime | None:
+    """When an SSO sign-in that cannot renew itself ends, from the AWS CLI's own cache; only `expiresAt` is read.
+    A session that renews itself (sso_session) keeps a refresh token and its end is not stored: None."""
+    key = ""
+    for setting in ("sso_session", "sso_start_url"):
+        code, out = _run(["aws", "configure", "get", setting, "--profile", profile])
+        if code == 0 and out:
+            key = out
+            break
+    if not key:
+        return None
+    cache = (
+        Path.home() / ".aws" / "sso" / "cache" / f"{hashlib.sha1(key.encode()).hexdigest()}.json"
+    )
+    try:
+        data = json.loads(cache.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or "refreshToken" in data:
+        return None
+    m = re.match(r"(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)", str(data.get("expiresAt", "")))
+    return datetime(*map(int, m.groups()), tzinfo=UTC) if m else None
+
+
+def long_lived_key(profile: str) -> bool:
+    """True when the shared credentials file holds a permanent access key for this profile. No value is kept."""
+    path = os.environ.get("AWS_SHARED_CREDENTIALS_FILE") or "~/.aws/credentials"
+    parser = configparser.RawConfigParser()
+    try:
+        parser.read(os.path.expanduser(path))
+    except (configparser.Error, OSError, UnicodeDecodeError):
+        return False
+    return parser.has_option(profile, "aws_access_key_id") and not parser.has_option(
+        profile, "aws_session_token"
+    )
 
 
 def _azure_connector(values: dict[str, str] | None = None) -> tuple[str, str, str]:
@@ -380,7 +445,7 @@ def _github_connector() -> tuple[str, str, str]:
         return (
             "github",
             "check",
-            f"{who}; a fine-grained token's access cannot be read from here: give it read-only repository access",
+            f"{who}; a fine-grained token's access cannot be read from here: confirm it is read-only",
         )
     names = re.findall(r"'([^']+)'", scopes.group(1)) or scopes.group(1).replace(" ", "").split(",")
     writes = [n for n in names if GITHUB_WRITE.match(n)]
@@ -430,6 +495,10 @@ def check_connectors(file: str, rows: list | None = None) -> list[tuple[str, str
                 aws_vars += cf.VAR.findall(env["AWS_PROFILE"])
             elif "AZURE_TENANT_ID" in env:
                 azure = True
+            elif server.get("type") == "http" and (server_name == "github" and shutil.which("gh")):
+                rows.append(_github_connector())
+            elif server.get("type") == "http" and PROBE and server.get("headers"):
+                rows.append((server_name, *probe(server)))
             elif server.get("type") == "http":
                 rows.append(
                     (
@@ -501,11 +570,50 @@ def plugin_connectors() -> list[tuple[str, str, str]]:
                         ),
                     )
                 )
+            elif name == "github" and shutil.which("gh"):
+                rows.append((label, *_github_connector()[1:]))
+            elif PROBE and server.get("headers"):
+                rows.append((label, *probe(server)))
             else:
                 rows.append(
                     (label, "in host", f"signs in inside the host: run /mcp and choose {name}")
                 )
     return rows
+
+
+PROBE = False  # doctor --probe: only then is a request sent to a connector's server
+
+
+def probe(server: dict) -> tuple[str, str]:
+    """(status, fix) from one MCP initialize request with the server's own header token. Sent only with --probe."""
+    expand = lambda v: NEEDS.sub(lambda m: os.environ.get(m.group(1), ""), str(v))
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "1xops", "version": __version__},
+        },
+    }
+    headers = {k: expand(v) for k, v in server.get("headers", {}).items()}
+    headers |= {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+    req = urllib.request.Request(
+        expand(server.get("url", "")), json.dumps(body).encode(), headers, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            code = res.status
+    except urllib.error.HTTPError as exc:
+        code = exc.code
+    except (urllib.error.URLError, OSError, ValueError):
+        return "broken", "does not answer: check the url and the network"
+    if 200 <= code < 300:
+        return "check", "answers; confirm the token is read-only"
+    if code in (401, 403):
+        return "signed out", "token refused: put a valid read-only token in .env.1xops"
+    return "unknown", f"answered {code}; cannot tell if it works: run /mcp in the assistant"
 
 
 def connector_rows(file: str, rows: list) -> list[tuple[str, str, str]]:
@@ -533,6 +641,7 @@ RESULT_STYLE = {
     "not connected": "yellow",
     "wrong account": "red",
     "in host": "dim",
+    "unknown": "yellow",
 }
 
 
@@ -600,6 +709,8 @@ def cmd_brief(args: argparse.Namespace) -> int:
 def cmd_doctor(args: argparse.Namespace) -> int:
     if getattr(args, "brief", False) or getattr(args, "hook", False):
         return cmd_brief(args)
+    global PROBE
+    PROBE = bool(getattr(args, "probe", False))
     # The identity calls take seconds; a spinner on a terminal, nothing when piped.
     with console.status("Checking tools, sign-ins and connectors (read-only)…"):
         rows = check_tools() + [check_edition()] + check_sign_in(args.aws_profile)
@@ -621,6 +732,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         style = RESULT_STYLE[result]
         table.add_row(name, needed, Text(result, style=style), Text(scrub(detail)))
     console.print(table)
+    checked = [r for r in shown if r[1] == "connector" and r[2] != "in host"]
+    if checked:
+        ready = sum(r[2] == "ready" for r in checked)
+        console.print(
+            f"Score: {ready} of {len(checked)} connectors ready", soft_wrap=True, highlight=False
+        )
     for line in next_steps(shown):
         console.print(line, soft_wrap=True)
     failed = [r[0] for r in rows if r[1] and not r[2]]
@@ -637,6 +754,14 @@ def next_steps(shown: list[tuple[str, str, str, str]]) -> list[Text]:
         (name, scrub(detail))
         for name, needed, result, detail in shown
         if result not in ("ok", "ready", "in host") and needed != "optional"
+    ]
+    soon = datetime.now(UTC) + timedelta(days=7)
+    todo += [
+        (name, f"sign-in ends {end:%Y-%m-%d %H:%M} UTC: {fix}")
+        for name, needed, result, _ in shown
+        if result == "ready" and name in SIGN_IN_ENDS
+        for end, fix in [SIGN_IN_ENDS[name]]
+        if end <= soon
     ]
     if not todo:
         return [Text("All set: nothing to fix.", style="green")]
@@ -755,6 +880,14 @@ def _resolve(args: argparse.Namespace) -> tuple[str, Path, Path | None, dict[str
 
 
 def cmd_config(args: argparse.Namespace) -> int:
+    try:
+        return _config(args)
+    except (ValueError, OSError) as exc:
+        console.print(Text(str(exc), style="red"), soft_wrap=True)
+        return 2
+
+
+def _config(args: argparse.Namespace) -> int:
     try:
         scope, project, out, connectors = _resolve(args)
         profiles = [(s.load_profile(name), values) for name, values in connectors.items()]
@@ -882,9 +1015,14 @@ def cmd_env(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_profiles(_: argparse.Namespace) -> int:
-    table = Table(title="Connector profiles")
-    for col in ("profile", "servers", "values (.env.1xops keys)", "description"):
+def cmd_profiles(args: argparse.Namespace) -> int:
+    print("1xops profiles is deprecated: use 1xops connectors", file=sys.stderr)
+    return cmd_connectors(args)
+
+
+def cmd_connectors(_: argparse.Namespace) -> int:
+    table = Table(title="Connectors")
+    for col in ("connector", "servers", "values (.env.1xops keys)", "description"):
         table.add_column(col)
     for name in s.builtin_profiles():
         p = s.load_profile(name)
@@ -917,6 +1055,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--hook", action="store_true", help="--brief in the host's session-start format")
     p.add_argument("--within", type=_seconds, help="seconds to spend, with --brief or --hook")
+    p.add_argument(
+        "--probe",
+        action="store_true",
+        help="send one request to each connector that signs in with a header token",
+    )
     p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("install", help="add the marketplaces and install the plugin")
@@ -951,7 +1094,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=[],
         metavar="PROFILE",
-        help="built-in profile names (see '1xops profiles') or .json files",
+        help="built-in profile names (see '1xops connectors') or .json files",
     )
     p.add_argument("--file", help="read scope, folder and connector values from .env.1xops")
     p.add_argument("--yes", action="store_true", help="write the changes (default: show a diff)")
@@ -973,7 +1116,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=cmd_tenants)
 
-    p = sub.add_parser("profiles", help="list built-in connector profiles")
+    p = sub.add_parser("connectors", help="list the built-in connectors: aws, azure, itsm")
+    p.set_defaults(func=cmd_connectors)
+    p = sub.add_parser("profiles")  # deprecated in 0.4: still works, says the new name
     p.set_defaults(func=cmd_profiles)
     return parser
 

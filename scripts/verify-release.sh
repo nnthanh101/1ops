@@ -14,7 +14,7 @@ CHECKS='set -e
 cd "$HOME"
 export COLUMNS=200
 v=$(1xops --version)
-1xops profiles >/dev/null
+1xops connectors >/dev/null
 mkdir -p org && 1xops config --scope org --out org --connectors aws azure itsm --yes >/dev/null
 grep -q "@azure/mcp@" org/managed-mcp.json && ! grep -q "@latest" org/managed-mcp.json
 grep -q "mcp__atlassian__\*" org/managed-settings.json

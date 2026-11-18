@@ -1,6 +1,7 @@
 // The 1xops commands: doctor, install, config, env, profiles, setup. Same behaviour as the Python
 // package (packages/python/src/one_xops/cli.py and setup.py). Nothing changes unless --yes is given.
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path, { join } from 'node:path';
@@ -42,8 +43,11 @@ export function run(cmd, args, timeout = 20000) {
 }
 
 export const mask = (account) => (account.length >= 4 ? `****${account.slice(-4)}` : '****');
-// Any 12-digit run (an AWS account ID) in any text, masked: doctor output is pasted onto issues as evidence.
-export const scrub = (text) => String(text).replace(/\d{12}/g, (d) => mask(d));
+// An AWS account ID (exactly 12 digits, not part of a longer number or a decimal) and an Azure ID, masked:
+// doctor output is pasted onto issues as evidence.
+const GUID = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g;
+const ACCOUNT_ID = /(?<!\d)(?<!\d\.)\d{12}(?!\d|\.\d)/g;
+export const scrub = (text) => String(text).replace(GUID, (d) => mask(d)).replace(ACCOUNT_ID, (d) => mask(d));
 // read: the role cannot change anything; write: it can; unknown: cannot tell from the name.
 export function accessFromRole(arn = '') {
   const role = arn.match(/:assumed-role\/([^/]+)\//)?.[1] ?? arn.match(/:(user|root)\b/)?.[1] ?? '';
@@ -181,7 +185,49 @@ export function awsConnector(v, values) {
   const expected = v.endsWith('_PROFILE') ? values[v.replace('_PROFILE', '_ACCOUNT')] || '' : '';
   if (expected && account !== expected) return [name, 'wrong account', `profile ${profile} is ${mask(account)}, this tenant expects ${mask(expected)}: aws configure sso --profile ${profile}`];
   const access = accessFromRole(id.Arn ?? '');
-  return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(account)}, ${ACCESS[access]}`];
+  let detail = `profile ${profile}, account ${mask(account)}, ${ACCESS[access]}`;
+  if (longLivedKey(profile)) return [name, 'check', `${detail}; long-lived access key: use SSO, aws configure sso --profile ${profile}`];
+  const end = ssoEnd(profile);
+  if (end) {
+    SIGN_IN_ENDS[name] = [end, `aws sso login --profile ${profile}`];
+    detail += `, signed in until ${utc(end)} UTC`;
+  }
+  return [name, access === 'read' ? 'ready' : 'check', detail];
+}
+
+export const SIGN_IN_ENDS = {}; // connector: [when its sign-in ends, the sign-in command]
+const utc = (d) => d.toISOString().slice(0, 16).replace('T', ' ');
+
+// When an SSO sign-in that cannot renew itself ends, from the AWS CLI's own cache; only `expiresAt` is read.
+// A session that renews itself (sso_session) keeps a refresh token and its end is not stored: null.
+export function ssoEnd(profile) {
+  let key = '';
+  for (const setting of ['sso_session', 'sso_start_url']) {
+    const { code, out } = run('aws', ['configure', 'get', setting, '--profile', profile]);
+    if (code === 0 && out) { key = out; break; }
+  }
+  if (!key) return null;
+  let data;
+  try { data = JSON.parse(readFileSync(join(homedir(), '.aws', 'sso', 'cache', `${createHash('sha1').update(key).digest('hex')}.json`), 'utf8')); } catch { return null; }
+  if (typeof data !== 'object' || data === null || Array.isArray(data) || 'refreshToken' in data) return null;
+  const m = String(data.expiresAt ?? '').match(/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/);
+  return m ? new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5])) : null;
+}
+
+// True when the shared credentials file holds a permanent access key for this profile. No value is kept.
+export function longLivedKey(profile) {
+  const file = (process.env.AWS_SHARED_CREDENTIALS_FILE || '~/.aws/credentials').replace(/^~(?=$|\/)/, homedir());
+  let text;
+  try { text = readFileSync(file, 'utf8'); } catch { return false; }
+  let inside = false;
+  const keys = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    const section = line.match(/^\s*\[([^\]]+)\]/);
+    if (section) { inside = section[1].trim() === profile; continue; }
+    const k = inside && line.match(/^\s*([A-Za-z0-9_]+)\s*[=:]/);
+    if (k) keys.add(k[1].toLowerCase());
+  }
+  return keys.has('aws_access_key_id') && !keys.has('aws_session_token');
 }
 
 export function azureConnector(values = {}) {
@@ -212,7 +258,7 @@ export function githubConnector() {
   const user = out.match(/account (\S+)/);
   const who = user ? `signed in as ${user[1]}` : 'signed in';
   const scopes = out.match(/Token scopes:\s*(.+)/);
-  if (!scopes) return ['github', 'check', `${who}; a fine-grained token's access cannot be read from here: give it read-only repository access`];
+  if (!scopes) return ['github', 'check', `${who}; a fine-grained token's access cannot be read from here: confirm it is read-only`];
   const quoted = [...scopes[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
   const names = quoted.length ? quoted : scopes[1].replace(/ /g, '').split(',');
   const writes = names.filter((n) => GITHUB_WRITE.test(n));
@@ -239,6 +285,8 @@ export function checkConnectors(file, rows = []) {
       const env = server.env ?? {};
       if ('AWS_PROFILE' in env) awsVars.push(...[...env.AWS_PROFILE.matchAll(/\$\{([A-Z0-9_]+)(?::-[^}]*)?\}/g)].map((m) => m[1]));
       else if ('AZURE_TENANT_ID' in env) azure = true;
+      else if (server.type === 'http' && serverName === 'github' && which('gh')) rows.push(githubConnector());
+      else if (server.type === 'http' && PROBE.on && server.headers) rows.push([serverName, ...probe(server)]);
       else if (server.type === 'http') rows.push([serverName, 'check', `signs in inside the host: run /mcp and choose ${serverName}`]);
       else rows.push([serverName, 'check', 'no sign-in check for this connector']);
     }
@@ -271,10 +319,30 @@ export function pluginConnectors() {
       const unset = [...new Set([...JSON.stringify(server).matchAll(/\$\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]))].filter((v) => !v.startsWith('CLAUDE_') && !process.env[v]);
       if (unset.length) rows.push([label, 'broken', `${unset.join(', ')} not set. Fix: put ${unset.map((v) => `${v}=<value>`).join(', ')} ${ENV_FIX}`]);
       else if ('url' in server && !String(server.url).trim()) rows.push([label, 'not connected', "no server. Fix: connect it in the assistant's connector settings, or list it in ONEXOPS_IGNORE in .env.1xops"]);
+      else if (name === 'github' && which('gh')) rows.push([label, ...githubConnector().slice(1)]);
+      else if (PROBE.on && server.headers) rows.push([label, ...probe(server)]);
       else rows.push([label, 'in host', `signs in inside the host: run /mcp and choose ${name}`]);
     }
   }
   return rows;
+}
+
+export const PROBE = { on: false }; // doctor --probe: only then is a request sent to a connector's server
+
+// [status, fix] from one MCP initialize request with the server's own header token. Sent only with --probe.
+// The request runs in a child Node.js process, so the check stays synchronous; the token goes in on stdin.
+export function probe(server) {
+  const expand = (v) => String(v).replace(/\$\{([A-Za-z0-9_]+)\}/g, (_, n) => process.env[n] ?? '');
+  const headers = Object.fromEntries(Object.entries(server.headers ?? {}).map(([k, v]) => [k, expand(v)]));
+  Object.assign(headers, { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' });
+  const body = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: '1xops', version: PROBE.version ?? '' } } };
+  const code = `let s='';process.stdin.on('data',(d)=>s+=d).on('end',async()=>{const r=JSON.parse(s);try{const res=await fetch(r.url,{method:'POST',headers:r.headers,body:r.body,signal:AbortSignal.timeout(5000)});process.stdout.write(String(res.status))}catch{process.stdout.write('0')}})`;
+  const p = spawnSync(process.execPath, ['-e', code], { input: JSON.stringify({ url: expand(server.url ?? ''), headers, body: JSON.stringify(body) }), encoding: 'utf8', timeout: 10000 });
+  const status = Number(p.stdout) || 0;
+  if (!status) return ['broken', 'does not answer: check the url and the network'];
+  if (status >= 200 && status < 300) return ['check', 'answers; confirm the token is read-only'];
+  if (status === 401 || status === 403) return ['signed out', 'token refused: put a valid read-only token in .env.1xops'];
+  return ['unknown', `answered ${status}; cannot tell if it works: run /mcp in the assistant`];
 }
 
 // The tenant's connectors and the plugin servers, minus the names in ONEXOPS_IGNORE.
@@ -317,10 +385,12 @@ function brief(opts) {
   return 0;
 }
 
-const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow', broken: 'red', 'not connected': 'yellow', 'wrong account': 'red', 'in host': 'dim' };
+const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow', broken: 'red', 'not connected': 'yellow', 'wrong account': 'red', 'in host': 'dim', unknown: 'yellow' };
 
 export function doctor(opts, version) {
   if (opts.brief || opts.hook) return brief(opts);
+  PROBE.on = Boolean(opts.probe);
+  PROBE.version = version;
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
@@ -331,8 +401,16 @@ export function doctor(opts, version) {
   shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
   // Required tools and configured connectors that are not ok or ready. Optional tools stay in the table only.
   const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[2] !== 'in host' && r[1] !== 'optional');
+  const soon = Date.now() + 7 * 86400000;
+  for (const r of shown) {
+    const end = r[2] === 'ready' && SIGN_IN_ENDS[r[0]];
+    if (end && end[0].getTime() <= soon) todo.push([r[0], r[1], r[2], `sign-in ends ${utc(end[0])} UTC: ${end[1]}`]);
+  }
+  const checked = shown.filter((r) => r[1] === 'connector' && r[2] !== 'in host');
+  const score = checked.length ? `Score: ${checked.filter((r) => r[2] === 'ready').length} of ${checked.length} connectors ready` : '';
   for (const r of shown) r[2] = color(RESULT_STYLE[r[2]], r[2]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
+  if (score) console.log(score);
   // What to do next, in table order (see todo above).
   if (!todo.length) console.log(color('green', 'All set: nothing to fix.'));
   else {
@@ -464,10 +542,17 @@ function showChange(file, before, after, linesToo = true) {
   return true;
 }
 
+// The same content writes nothing; a change keeps the previous file as <name>.bak.
 function write(file, data) {
   mkdirSync(path.dirname(file), { recursive: true });
+  const text = typeof data === 'string' ? data : s.dumps(data);
+  if (existsSync(file)) {
+    const old = readFileSync(file);
+    if (old.equals(Buffer.from(text))) return;
+    writeFileSync(`${file}.bak`, old);
+  }
   const tmp = `${file}.tmp`;
-  writeFileSync(tmp, typeof data === 'string' ? data : s.dumps(data), { flush: true }); // on disk before the swap
+  writeFileSync(tmp, text, { flush: true }); // on disk before the swap
   renameSync(tmp, file);
 }
 
@@ -486,6 +571,15 @@ function resolveConfig(opts) {
 }
 
 export function config(opts) {
+  try {
+    return configure(opts);
+  } catch (err) {
+    console.log(color('red', err.message));
+    return 2;
+  }
+}
+
+function configure(opts) {
   let scope, project, out, profiles;
   try {
     ({ scope, project, out } = resolveConfig(opts));
@@ -600,12 +694,12 @@ export function env(opts) {
   return 0;
 }
 
-export function profiles() {
+export function connectors() {
   const rows = s.builtinProfiles().map((name) => {
     const p = s.loadProfile(name);
     return [name, Object.keys(p.mcpServers).join(', '), cf.variables(p).join(', ') || '—', p.description ?? ''];
   });
-  table('Connector profiles', ['profile', 'servers', 'values (.env.1xops keys)', 'description'], rows);
+  table('Connectors', ['connector', 'servers', 'values (.env.1xops keys)', 'description'], rows);
   console.log("Use your own: a .json file with an 'mcpServers' object, as a connector name.");
   return 0;
 }
@@ -692,6 +786,8 @@ const tenantNote = (name, connectors) => `---\nid: ${slug(name)}\ntitle: ${name}
   + 'services and systems in `entities/` (type: entity), decisions in `decisions/` (type: decision).\n\n'
   + 'Notes may name things: profiles, accounts masked as ****1234. They never hold keys, tokens or passwords.\n';
 
+const READER_FIX = 'sign in with a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login';
+
 export async function setup(opts) {
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
   const lines = rl[Symbol.asyncIterator]();
@@ -749,7 +845,8 @@ export async function setup(opts) {
           console.log('    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again. Or type the ID now.');
           azureShown = true;
         }
-        return ask('  AZURE_SUBSCRIPTION_ID (blank to skip)', process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '');
+        const def = process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '';
+        return (await ask(def ? `  AZURE_SUBSCRIPTION_ID (Enter keeps ****${def.slice(-4)})` : '  AZURE_SUBSCRIPTION_ID (blank to skip)')) || def;
       }
       table(`Azure subscriptions of the Reader identity (${rows.length})`, ['#', 'name', 'subscription', 'tenant'], rows.map(([n, s, t], i) => [String(i + 1), n, `****${s.slice(-4)}`, `****${t.slice(-4)}`]));
       const current = process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '';
@@ -820,7 +917,9 @@ export async function setup(opts) {
           continue;
         }
         const def = process.env[v] || found[v] || DEFAULTS[v] || '';
-        const value = await ask(def ? `  ${v}` : `  ${v} (blank to skip)`, def);
+        const value = def && scrub(def) !== def // an ID: shown masked, kept in full
+          ? (await ask(`  ${v} (Enter keeps ${scrub(def)})`)) || def
+          : await ask(def ? `  ${v}` : `  ${v} (blank to skip)`, def);
         if (value) values[v] = value;
       }
       connectors[name] = values;
@@ -829,8 +928,45 @@ export async function setup(opts) {
     if (own) connectors[own] = {};
     conf.connectors = connectors;
 
+    // Before any file is written: one read-only identity call per AWS profile and for Azure.
+    const MARK = { ready: ['✓', 'green'], check: ['!', 'yellow'] };
+    const verify = async (label, check, login) => {
+      const show = (row) => { const [mark, style] = MARK[row[1]] ?? ['✗', 'red']; console.log(`  ${color(style, mark)} ${label}: ${scrub(row[2])}`); };
+      let row = check();
+      show(row);
+      if (row[1] === 'signed out' && which(login[0]) && (await yes(`  Sign in now? (${login.join(' ')}; opens your browser)`, true))) {
+        spawnSync(login[0], login.slice(1), { stdio: 'inherit' });
+        row = check();
+        show(row);
+      }
+      return row;
+    };
+    const failed = [];
+    const checks = [];
+    for (const [name, values] of Object.entries(connectors)) {
+      if (name === 'aws') {
+        for (const v of ['AWS_BILLING_PROFILE', 'AWS_OPERATIONS_PROFILE']) {
+          const p = values[v];
+          if (p) checks.push([`aws ${v}`, () => awsConnector(v, { [v]: p }), ['aws', 'sso', 'login', '--profile', p]]);
+        }
+      } else if (name === 'azure') {
+        if (!process.env.AZURE_CONFIG_DIR) failed.push(['azure', READER_FIX]);
+        else checks.push(['azure', () => azureConnector(values), ['az', 'login', '--output', 'none']]);
+      }
+    }
+    if (checks.length) console.log('\nSign-in: one read-only call each, before any file is written.');
+    for (const [label, check, login] of checks) {
+      const row = await verify(label, check, login);
+      if (row[1] !== 'ready' && row[1] !== 'check') failed.push([label, row[2]]);
+    }
+    if (failed.length) {
+      console.log('\nNothing changed. Fix the sign-in, then run 1xops setup again:');
+      for (const [label, fix] of failed) console.log(`  ${label}: ${scrub(fix)}`);
+      return 1;
+    }
+
     const text = cf.dump(conf);
-    console.log(`\n${color('bold', file)}\n${text}`);
+    console.log(`\n${color('bold', file)}\n${scrub(text)}`);
     if (existsSync(file) && !(await yes(`${file} exists. Replace it?`, false))) return 1;
     if (!(await yes(`Write ${file}?`, true))) return 1;
     write(file, text);
@@ -851,26 +987,8 @@ export async function setup(opts) {
     else console.log(`Apply later with: 1xops config --file ${file} --yes`);
     if (code === 0 && Object.keys(connectors).length && (await yes("Connect and verify now? (signs in with each provider's own command)", true))) {
       console.log('\nConnect: sign in, then check that access is read-only.');
-      const verify = async (label, check, login) => {
-        const show = (row) => console.log(`  ${row[1] === 'ready' ? '✓' : '✗'} ${label}: ${scrub(row[2])}`);
-        let row = check();
-        show(row);
-        if (row[1] === 'signed out' && which(login[0]) && (await yes(`  Sign in now? (${login.join(' ')}; opens your browser)`, true))) {
-          spawnSync(login[0], login.slice(1), { stdio: 'inherit' });
-          row = check();
-          show(row);
-        }
-      };
-      for (const [name, values] of Object.entries(connectors)) {
-        if (name === 'aws') {
-          for (const v of ['AWS_BILLING_PROFILE', 'AWS_OPERATIONS_PROFILE']) {
-            const p = values[v];
-            if (p) await verify(`aws ${v}`, () => awsConnector(v, { [v]: p }), ['aws', 'sso', 'login', '--profile', p]);
-          }
-        } else if (name === 'azure') {
-          if (!process.env.AZURE_CONFIG_DIR) console.log('  azure: use a Reader identity in its own folder (AZURE_CONFIG_DIR), then run setup again.');
-          else await verify('azure', () => azureConnector(values), ['az', 'login']);
-        } else if (name === 'itsm') {
+      for (const name of Object.keys(connectors)) {
+        if (name === 'itsm') {
           console.log('  itsm: sign in inside the assistant: start it in this folder, run /mcp and choose atlassian.');
           if (which('claude') && (await yes('  Start the assistant here now to sign in? (claude)', false))) spawnSync('claude', [], { stdio: 'inherit' });
         }

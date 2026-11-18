@@ -90,7 +90,7 @@ test('the check only reads identity: three known calls, nothing else', () => {
       const before = readFileSync(file, 'utf8');
       checkConnectors(file);
       assert.ok(calls().length > 0, 'the shims were never reached');
-      for (const c of calls()) assert.ok(/^(aws sts get-caller-identity |az account show |az role assignment list )/.test(c), c);
+      for (const c of calls()) assert.ok(/^(aws sts get-caller-identity |aws configure get |az account show |az role assignment list )/.test(c), c);
       assert.equal(readFileSync(file, 'utf8'), before);
     });
   }

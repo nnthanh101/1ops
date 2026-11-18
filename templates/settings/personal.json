@@ -102,6 +102,8 @@
       "Read(~/.aws/sso/cache/**)",
       "Read(~/.azure/**)",
       "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.azure-reader/**)",
       "Bash(gh issue create *)",
       "Bash(gh issue edit *)",
       "Bash(gh issue comment *)",

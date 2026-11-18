@@ -210,9 +210,11 @@ def ask_subscription(found: dict) -> str:
             _shown.add("azure-none")
         default = os.environ.get("AZURE_SUBSCRIPTION_ID") or found.get("AZURE_SUBSCRIPTION_ID")
         return Prompt.ask(
-            "  AZURE_SUBSCRIPTION_ID (blank to skip)",
+            f"  AZURE_SUBSCRIPTION_ID (Enter keeps ****{default[-4:]})"
+            if default
+            else "  AZURE_SUBSCRIPTION_ID (blank to skip)",
             default=default or "",
-            show_default=bool(default),
+            show_default=False,
         )
     table = Table(
         title=f"Azure subscriptions of the Reader identity ({len(rows)})", title_style="bold"
@@ -253,20 +255,29 @@ def ask_value(var: str, found: dict) -> str:
     if var == "AZURE_TENANT_ID" and var in _picked:
         console.print("  AZURE_TENANT_ID: taken from the subscription.", highlight=False)
         return _picked[var]
+    from one_xops import cli
+
     default = os.environ.get(var) or found.get(var) or DEFAULTS.get(var)
+    if default and cli.scrub(default) != default:  # an ID: shown masked, kept in full
+        return Prompt.ask(
+            f"  {var} (Enter keeps {cli.scrub(default)})", default=default, show_default=False
+        )
     label = f"  {var}" if default else f"  {var} (blank to skip)"
     return Prompt.ask(label, default=default or "", show_default=bool(default))
 
 
-def _verify(label: str, check, login: list[str]) -> None:
-    """Show whether a connector is ready; when it is signed out, offer the provider's own sign-in and check again."""
+MARK = {"ready": ("✓", "green"), "check": ("!", "yellow")}  # anything else: ✗ in red
+
+
+def _verify(label: str, check, login: list[str]) -> tuple[str, str, str]:
+    """Show whether a connector is ready; when it is signed out, offer the provider's own sign-in and check again.
+    Returns the last result."""
     from one_xops import cli
 
     def show(row: tuple[str, str, str]) -> None:
+        mark, style = MARK.get(row[1], ("✗", "red"))
         console.print(
-            f"  {'✓' if row[1] == 'ready' else '✗'} {label}: {cli.scrub(row[2])}",
-            markup=False,
-            highlight=False,
+            Text.assemble("  ", (mark, style), f" {label}: {cli.scrub(row[2])}"), highlight=False
         )
 
     row = check()
@@ -277,35 +288,66 @@ def _verify(label: str, check, login: list[str]) -> None:
         and Confirm.ask(f"  Sign in now? ({' '.join(login)}; opens your browser)", default=True)
     ):
         subprocess.run(login, check=False)
-        show(check())
+        row = check()
+        show(row)
+    return row
 
 
-def connect(connectors: dict[str, dict[str, str]]) -> None:
-    """Sign in with each provider's own command, then check that access is read-only."""
+def check_sign_ins(connectors: dict[str, dict[str, str]]) -> list[tuple[str, str]]:
+    """Before any file is written: one read-only identity call per AWS profile and for Azure, with the provider's own
+    sign-in offered when signed out. Returns (connector, fix) for each that still does not work."""
     from one_xops import cli
 
-    console.print("\nConnect: sign in, then check that access is read-only.", markup=False)
+    failed: list[tuple[str, str]] = []
+    checks = []
     for name, values in connectors.items():
         if name == "aws":
             for var in ("AWS_BILLING_PROFILE", "AWS_OPERATIONS_PROFILE"):
                 profile = values.get(var)
                 if profile:
-                    _verify(
-                        f"aws {var}",
-                        lambda var=var, profile=profile: cli._aws_connector(var, {var: profile}),
-                        ["aws", "sso", "login", "--profile", profile],
+                    checks.append(
+                        (
+                            f"aws {var}",
+                            lambda var=var, profile=profile: cli._aws_connector(
+                                var, {var: profile}
+                            ),
+                            ["aws", "sso", "login", "--profile", profile],
+                        )
                     )
         elif name == "azure":
             if not os.environ.get("AZURE_CONFIG_DIR"):
-                console.print(
-                    "  azure: use a Reader identity in its own folder (AZURE_CONFIG_DIR), then run setup again.",
-                    markup=False,
-                )
+                failed.append(("azure", READER_FIX))
             else:
-                _verify(
-                    "azure", lambda values=values: cli._azure_connector(values), ["az", "login"]
+                checks.append(
+                    (
+                        "azure",
+                        lambda values=values: cli._azure_connector(values),
+                        ["az", "login", "--output", "none"],
+                    )
                 )
-        elif name == "itsm":
+    if checks:
+        console.print(
+            "\nSign-in: one read-only call each, before any file is written.", markup=False
+        )
+    for label, check, login in checks:
+        row = _verify(label, check, login)
+        if row[1] not in ("ready", "check"):
+            failed.append((label, row[2]))
+    return failed
+
+
+READER_FIX = (
+    "sign in with a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login"
+)
+
+
+def connect(connectors: dict[str, dict[str, str]]) -> None:
+    """After the files are written: the connectors that sign in inside the assistant, and GitHub."""
+    from one_xops import cli
+
+    console.print("\nConnect: sign in, then check that access is read-only.", markup=False)
+    for name in connectors:
+        if name == "itsm":
             console.print(
                 "  itsm: sign in inside the assistant: start it in this folder, run /mcp and choose atlassian.",
                 markup=False,
@@ -433,10 +475,19 @@ def run(args: argparse.Namespace) -> int:
         connectors[own] = {}
     config["connectors"] = connectors
 
+    failed = check_sign_ins(connectors)
+    if failed:
+        console.print(
+            "\nNothing changed. Fix the sign-in, then run 1xops setup again:", markup=False
+        )
+        for label, fix in failed:
+            console.print(f"  {label}: {cli.scrub(fix)}", markup=False, highlight=False)
+        return 1
+
     text = cf.dump(config)
     console.print()
     console.print(Text(str(path), style="bold"))
-    console.print(text, markup=False, highlight=False, soft_wrap=True)
+    console.print(cli.scrub(text), markup=False, highlight=False, soft_wrap=True)
     if path.exists() and not Confirm.ask(f"{path} exists. Replace it?", default=False):
         return 1
     if not Confirm.ask(f"Write {path}?", default=True):

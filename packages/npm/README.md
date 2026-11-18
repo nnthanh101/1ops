@@ -6,6 +6,7 @@ The `1xops` command line of [1ops by OceanSoft.io](https://github.com/nnthanh101
 npx 1xops doctor                       # prerequisites and read-only sign-in (account IDs masked)
 npx 1xops install --yes                # add the marketplaces and install the plugin
 npx 1xops setup                        # guided: asks a few questions, writes .env.1xops, shows the diff
+npx 1xops connectors                   # built-in connectors: aws, azure, itsm
 npx 1xops config --scope team --connectors aws azure itsm   # shows a diff; add --yes to write
 ```
 
