@@ -1,6 +1,6 @@
 {
   "name": "1xops",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "description": "1xops by OceanSoft.io: set up the 1xops plugin, settings and read-only cloud connectors for an organisation, team or person. Native Node.js, no dependencies.",
   "license": "Apache-2.0",
   "author": "Nhat-Thanh Nguyen <nnthanh101@gmail.com> (https://www.oceansoft.io)",
@@ -9,10 +9,10 @@
   "bugs": "https://github.com/nnthanh101/1xops/issues",
   "type": "module",
   "bin": { "1xops": "bin/1xops.mjs" },
-  "files": ["bin", "src", "profiles", "README.md"],
+  "files": ["bin", "src", "profiles", "templates", "README.md", "LICENSE", "NOTICE"],
   "engines": { "node": ">=24" },
   "scripts": {
     "test": "node --test --test-reporter=spec",
-    "prepack": "rm -rf profiles && mkdir profiles && cp ../python/src/one_xops/profiles/*.json profiles/"
+    "prepack": "rm -rf profiles templates && mkdir profiles templates && cp ../python/src/one_xops/profiles/*.json profiles/ && cp -R ../../templates/settings templates/ && cp ../../LICENSE ../../NOTICE ."
   }
 }

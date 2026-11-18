@@ -33,12 +33,18 @@ jobs:
           git submodule update --remote upstream/knowledge-work-plugins
           new=$(git -C upstream/knowledge-work-plugins rev-parse --short HEAD)
           if [ "$old" = "$new" ]; then echo "Already at upstream $new"; exit 0; fi
-          test -f plugins/operations/.claude-plugin/plugin.json || { echo "upstream moved operations/"; exit 1; }
+          test -f plugins/operations/.claude-plugin/plugin.json -a -d plugins/operations/skills \
+            || { echo "upstream moved operations/ or its skills/"; exit 1; }
           branch="feature/upstream-bump-$(date -u +%Y-%m)"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "$branch already exists; merge or close that PR first"; exit 0
+          fi
+          ops=$(git -C upstream/knowledge-work-plugins log --oneline "$old..$new" -- operations | head -20)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git commit -am "chore: knowledge-work-plugins $old → $new"
           git push -u origin "$branch"
-          gh pr create --base develop --title "chore: knowledge-work-plugins $old → $new" \
-            --body "Monthly upstream pin bump. Upstream changes: https://github.com/anthropics/knowledge-work-plugins/compare/$old...$new"
+          body="Monthly upstream pin bump. All upstream changes: https://github.com/anthropics/knowledge-work-plugins/compare/$old...$new"
+          body="$body"$'\n\n'"Changes under operations/ (the plugin 1xops depends on):"$'\n\n'"${ops:-none}"
+          gh pr create --base develop --title "chore: knowledge-work-plugins $old → $new" --body "$body"

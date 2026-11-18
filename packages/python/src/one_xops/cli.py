@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from rich.console import Console
@@ -67,10 +68,27 @@ def bundle_version(path: str) -> str:
     return str(plugin.get("version", "0"))
 
 
-def _run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
+class OutOfTime(Exception):
+    """The time given with --within ran out."""
+
+
+_deadline: float | None = None  # set only while a session-start check runs
+
+
+def _run(cmd: list[str], timeout: float = 20) -> tuple[int, str]:
+    limit = timeout
+    if _deadline is not None:  # each call gets only the time that is left
+        left = _deadline - time.monotonic()
+        if left <= 0:
+            raise OutOfTime
+        limit = min(timeout, left)
     try:
-        p = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=timeout)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        p = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=limit)
+    except subprocess.TimeoutExpired as exc:
+        if limit < timeout:
+            raise OutOfTime from exc
+        return 1, str(exc)
+    except OSError as exc:
         return 1, str(exc)
     return p.returncode, (p.stdout or p.stderr).strip()
 
@@ -249,18 +267,57 @@ def _aws_connector(var: str, values: dict[str, str]) -> tuple[str, str, str]:
         ident = json.loads(out)
     except ValueError:
         return name, "check", "AWS identity call returned no account"
+    account = ident.get("Account", "")
+    expected = (
+        (values.get(var.replace("_PROFILE", "_ACCOUNT")) or "") if var.endswith("_PROFILE") else ""
+    )
+    if expected and account != expected:
+        return (
+            name,
+            "wrong account",
+            (
+                f"profile {profile} is {_mask(account)}, this tenant expects {_mask(expected)}: "
+                f"aws configure sso --profile {profile}"
+            ),
+        )
     access = access_from_role(ident.get("Arn", ""))
-    detail = f"profile {profile}, account {_mask(ident.get('Account', ''))}, {ACCESS[access]}"
+    detail = f"profile {profile}, account {_mask(account)}, {ACCESS[access]}"
     return name, "ready" if access == "read" else "check", detail
 
 
-def _azure_connector() -> tuple[str, str, str]:
+def _azure_connector(values: dict[str, str] | None = None) -> tuple[str, str, str]:
+    values = values or {}
     if not shutil.which("az"):
         return "azure", "missing", "install the Azure CLI"
     fix = "az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR"
     code, out = _run(["az", "account", "show", "--query", "user.name", "--output", "tsv"])
     if code != 0 or not out:
         return "azure", "signed out", fix
+    want_tenant, want_sub = (
+        values.get("AZURE_TENANT_ID", ""),
+        values.get("AZURE_SUBSCRIPTION_ID", ""),
+    )
+    if want_tenant or want_sub:
+        code, ids = _run(["az", "account", "show", "--query", "[tenantId,id]", "--output", "tsv"])
+        tenant, _, sub = ids.partition("\t") if code == 0 else ("", "", "")
+        if want_tenant and tenant and tenant != want_tenant:
+            return (
+                "azure",
+                "wrong account",
+                (
+                    f"tenant is {_mask(tenant)}, this tenant expects {_mask(want_tenant)}: "
+                    "az login --tenant <AZURE_TENANT_ID>"
+                ),
+            )
+        if want_sub and sub and sub != want_sub:
+            return (
+                "azure",
+                "wrong account",
+                (
+                    f"subscription is {_mask(sub)}, this tenant expects {_mask(want_sub)}: "
+                    "az account set --subscription <AZURE_SUBSCRIPTION_ID>"
+                ),
+            )
     code, roles = _run(
         [
             "az",
@@ -285,20 +342,62 @@ def _azure_connector() -> tuple[str, str, str]:
     return "azure", "ready" if access == "read" else "check", AZURE_ACCESS[access]
 
 
-def check_connectors(file: str) -> list[tuple[str, str, str]]:
-    """(connector, status, fix) for each connector in .env.1xops. Read-only identity calls only."""
+GITHUB_WRITE = re.compile(
+    r"^(repo|public_repo|workflow|gist|delete_repo|codespace|write:.*|admin:.*)$"
+)
+
+
+def _github_connector() -> tuple[str, str, str]:
+    """GitHub sign-in of the gh CLI: ready only when the token cannot change things. Prints no token."""
+    if not shutil.which("gh"):
+        return "github", "missing", "install the GitHub CLI"
+    code, out = _run(["gh", "auth", "status"])
+    if code != 0:
+        return "github", "signed out", "gh auth login --web"
+    user = re.search(r"account (\S+)", out)
+    who = f"signed in as {user.group(1)}" if user else "signed in"
+    scopes = re.search(r"Token scopes:\s*(.+)", out)
+    if not scopes:
+        return (
+            "github",
+            "check",
+            f"{who}; a fine-grained token's access cannot be read from here: give it read-only repository access",
+        )
+    names = re.findall(r"'([^']+)'", scopes.group(1)) or scopes.group(1).replace(" ", "").split(",")
+    writes = [n for n in names if GITHUB_WRITE.match(n)]
+    if writes:
+        return (
+            "github",
+            "check",
+            f"{who}; the token can change things ({', '.join(writes)}): use a fine-grained read-only token",
+        )
+    return "github", "ready", f"{who}, read-only scopes"
+
+
+def check_connectors(file: str, rows: list | None = None) -> list[tuple[str, str, str]]:
+    """(connector, status, fix) for each connector in .env.1xops. Read-only identity calls only.
+    Rows are added to `rows` as they are found, so a check that runs out of time keeps what it has."""
+    rows = [] if rows is None else rows
     path = Path(file)
     if not path.is_file():
-        return [("connectors", "missing", f"no {file} here: run 1xops setup")]
+        rows.append(("connectors", "missing", f"no {file} here: run 1xops setup"))
+        return rows
     try:
         cfg = cf.load(path)
     except (ValueError, OSError) as exc:
-        return [("connectors", "missing", str(exc))]
+        rows.append(("connectors", "missing", str(exc)))
+        return rows
+    for key in (
+        "AWS_CONFIG_FILE",
+        "AZURE_CONFIG_DIR",
+    ):  # this tenant's own, never another tenant's from the shell
+        if cfg["values"].get(key):
+            os.environ[key] = os.path.expanduser(cfg["values"][key])
     if not cfg["connectors"]:
-        return [
+        rows.append(
             ("connectors", "missing", f"ONEXOPS_CONNECTORS is empty in {file}: run 1xops setup")
-        ]
-    rows = []
+        )
+        return rows
     for connector in cfg["connectors"]:
         try:
             servers = s.load_profile(connector)["mcpServers"]
@@ -322,9 +421,86 @@ def check_connectors(file: str) -> list[tuple[str, str, str]]:
                 )
             else:
                 rows.append((server_name, "check", "no sign-in check for this connector"))
-        rows += [_aws_connector(v, cfg["values"]) for v in dict.fromkeys(aws_vars)]
+        for v in dict.fromkeys(aws_vars):
+            rows.append(_aws_connector(v, cfg["values"]))
         if azure:
-            rows.append(_azure_connector())
+            rows.append(_azure_connector(cfg["values"]))
+    return rows
+
+
+NEEDS = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
+ENV_FIX = 'in .env.1xops, then start the assistant from a shell that ran eval "$(1xops env)"'
+
+
+def plugin_connectors() -> list[tuple[str, str, str]]:
+    """(server (plugin), status, fix) for the servers of the installed 1xops plugin and of the operations plugin
+    it depends on, from the host's own plugin records. Reads no token, makes no call."""
+    folder = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / f".{s.HOST}") / "plugins"
+    try:
+        installed = json.loads((folder / "installed_plugins.json").read_text()).get("plugins", {})
+    except (OSError, ValueError, AttributeError):
+        return []
+    rows = []
+    for key, entries in installed.items():
+        plugin = key.partition("@")[0]
+        if plugin != "1xops" and key != "operations@knowledge-work-plugins":
+            continue
+        try:
+            data = json.loads((Path(entries[0]["installPath"]) / ".mcp.json").read_text())
+            servers = data.get("mcpServers", data)
+            servers.items()
+        except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError):
+            continue
+        for name, server in servers.items():
+            if not isinstance(server, dict):
+                continue
+            label = f"{name} ({plugin})"
+            unset = [
+                v
+                for v in dict.fromkeys(NEEDS.findall(json.dumps(server)))
+                if not v.startswith("CLAUDE_") and not os.environ.get(v)
+            ]
+            if unset:
+                rows.append(
+                    (
+                        label,
+                        "broken",
+                        (
+                            f"{', '.join(unset)} not set. Fix: put "
+                            f"{', '.join(v + '=<value>' for v in unset)} {ENV_FIX}"
+                        ),
+                    )
+                )
+            elif "url" in server and not str(server["url"]).strip():
+                rows.append(
+                    (
+                        label,
+                        "not connected",
+                        (
+                            "no server. Fix: connect it in the assistant's connector settings, "
+                            "or list it in ONEXOPS_IGNORE in .env.1xops"
+                        ),
+                    )
+                )
+            else:
+                rows.append(
+                    (label, "in host", f"signs in inside the host: run /mcp and choose {name}")
+                )
+    return rows
+
+
+def connector_rows(file: str, rows: list) -> list[tuple[str, str, str]]:
+    """The tenant's connectors and the plugin servers, minus the names in ONEXOPS_IGNORE."""
+    try:
+        values = cf.load(Path(file))["values"]
+    except (ValueError, OSError):
+        values = {}
+    ignore = {n.strip() for n in values.get("ONEXOPS_IGNORE", "").split(",") if n.strip()}
+    try:
+        rows += plugin_connectors()
+        check_connectors(file, rows)
+    finally:
+        rows[:] = [r for r in rows if r[0] not in ignore and r[0].split(" (")[0] not in ignore]
     return rows
 
 
@@ -334,14 +510,70 @@ RESULT_STYLE = {
     "missing": "red",
     "signed out": "yellow",
     "check": "yellow",
+    "broken": "red",
+    "not connected": "yellow",
+    "wrong account": "red",
+    "in host": "dim",
 }
 
 
+SKIP_AT_START = ("ready", "in host")
+QUIET = ("signs in inside the host", "no sign-in check")
+
+
+def brief_text(file: str, within: float | None) -> str:
+    """Session start: one line per connector that is not ready, with its fix. Nothing when all is ready.
+    Never raises; a check that runs out of time or fails adds one line saying so."""
+    global _deadline
+    rows: list = []
+    done = True
+    _deadline = None if within is None else time.monotonic() + within
+    try:
+        if Path(file).is_file():  # not a tenant folder: nothing to say
+            connector_rows(file, rows)
+    except Exception:  # noqa: BLE001 (OutOfTime too: a session is never held up)
+        done = False
+    finally:
+        _deadline = None
+    lines = [
+        f"{name}: {scrub(fix)}"
+        for name, status, fix in rows
+        if status not in SKIP_AT_START and not fix.startswith(QUIET)
+    ]
+    if not done:
+        when = "" if within is None else f" in {within:g} s"
+        lines.append(f"1xops: the check did not finish{when}; run 1xops doctor for the rest.")
+    return "\n".join(lines)
+
+
+def cmd_brief(args: argparse.Namespace) -> int:
+    text = brief_text(args.file, args.within)
+    if text and args.hook:  # the host's envelope; the text is the same
+        print(
+            json.dumps(
+                {
+                    "systemMessage": text,
+                    "hookSpecificOutput": {
+                        "hookEventName": "SessionStart",
+                        "additionalContext": text,
+                    },
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+    elif text:
+        print(text)
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
+    if getattr(args, "brief", False) or getattr(args, "hook", False):
+        return cmd_brief(args)
     # The identity calls take seconds; a spinner on a terminal, nothing when piped.
     with console.status("Checking tools, sign-ins and connectors (read-only)…"):
         rows = check_tools() + [check_edition()] + check_sign_in(args.aws_profile)
-        connectors = check_connectors(args.file)
+        connectors = connector_rows(args.file, [])
     shown = [
         (
             name,
@@ -374,7 +606,7 @@ def next_steps(shown: list[tuple[str, str, str, str]]) -> list[Text]:
     todo = [
         (name, scrub(detail))
         for name, needed, result, detail in shown
-        if result not in ("ok", "ready") and needed != "optional"
+        if result not in ("ok", "ready", "in host") and needed != "optional"
     ]
     if not todo:
         return [Text("All set: nothing to fix.", style="green")]
@@ -480,8 +712,9 @@ def _resolve(args: argparse.Namespace) -> tuple[str, Path, Path | None, dict[str
     """Scope, folder, org output and {connector: values}, from .env.1xops or the flags."""
     if args.file:
         cfg = cf.load(Path(args.file))
-        out = Path(cfg["out"]).resolve() if cfg["out"] else None
-        return cfg["scope"], Path(cfg["dir"]).resolve(), out, cfg["connectors"]
+        base = Path(args.file).resolve().parent  # a relative folder means: relative to this file
+        out = (base / cfg["out"]).resolve() if cfg["out"] else None
+        return cfg["scope"], (base / cfg["dir"]).resolve(), out, cfg["connectors"]
     out = Path(args.out).resolve() if args.out else None
     return args.scope, Path(args.dir).resolve(), out, {c: {} for c in args.connectors}
 
@@ -495,7 +728,7 @@ def cmd_config(args: argparse.Namespace) -> int:
         return 2
     personal = scope in ("local", "personal")
     servers: dict = {}
-    wanted = s.BASELINE
+    wanted = s.template(scope)
     for profile, values in profiles:
         # Shared files keep ${VAR}; private host config gets the person's values.
         servers.update(
@@ -551,6 +784,40 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tenants(args: argparse.Namespace) -> int:
+    """One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing."""
+    root = Path(args.folder)
+    folders = (
+        sorted(p for p in root.iterdir() if p.is_dir() and (p / cf.DEFAULT_FILE).is_file())
+        if root.is_dir()
+        else []
+    )
+    if not folders:
+        print(f"No tenant folders (a folder with its own {cf.DEFAULT_FILE}) under {root}.")
+        return 0
+    cmd = [sys.executable, "-m", "one_xops.cli", "doctor", "--brief", "--within", "8"]
+    runs = [
+        (
+            f,
+            subprocess.Popen(
+                cmd, cwd=f, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            ),
+        )
+        for f in folders
+    ]
+    need = 0
+    for folder, proc in runs:
+        lines = [ln for ln in proc.communicate()[0].splitlines() if ln.strip()]
+        if lines:
+            need += 1
+            more = f" (+{len(lines) - 1} more)" if len(lines) > 1 else ""
+            print(f"✗ {folder.name}: {scrub(lines[0])}{more}")
+        else:
+            print(f"✓ {folder.name}: ready")
+    print(f"{len(folders)} tenants, {need} need attention")
+    return 0
+
+
 def cmd_env(args: argparse.Namespace) -> int:
     """Print `export VAR=value` lines from .env.1xops, for team and org scopes."""
     try:
@@ -593,6 +860,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--file", default=cf.DEFAULT_FILE, help="connectors to check (default: .env.1xops)"
     )
+    p.add_argument(
+        "--brief", action="store_true", help="only connectors that are not ready, one line each"
+    )
+    p.add_argument("--hook", action="store_true", help="--brief in the host's session-start format")
+    p.add_argument("--within", type=float, help="seconds to spend, with --brief or --hook")
     p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("install", help="add the marketplaces and install the plugin")
@@ -642,6 +914,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("setup", help="guided setup: asks questions, writes .env.1xops")
     p.add_argument("--file", default=cf.DEFAULT_FILE)
     p.set_defaults(func=wizard.run)
+
+    p = sub.add_parser("tenants", help="status of every tenant folder under a folder")
+    p.add_argument(
+        "folder", nargs="?", default=".", help="the folder that holds the tenant folders"
+    )
+    p.set_defaults(func=cmd_tenants)
 
     p = sub.add_parser("profiles", help="list built-in connector profiles")
     p.set_defaults(func=cmd_profiles)

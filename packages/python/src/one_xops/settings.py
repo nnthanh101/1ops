@@ -12,62 +12,30 @@ HOST = "claude"  # host CLI binary and config folder name (technical identifier)
 
 SCOPES = ("org", "team", "local", "personal")
 
-MARKETPLACES = {
-    "1ops": {"source": {"source": "github", "repo": "nnthanh101/1xops"}},  # free edition
-    "knowledge-work-plugins": {
-        "source": {"source": "github", "repo": "anthropics/knowledge-work-plugins"}
-    },
-}
+# The rules each scope receives live in templates/settings/{org,team,local,personal}.json, one file per scope,
+# compared on one page in templates/settings/README.md. A build copies them next to this file.
 
-# Baseline every scope receives: the plugin, its base dependency, no secret reads,
-# and a person's yes before anything leaves the machine, rewrites history or changes AWS or Azure
-# (sessions sign in read-only; these rules ask, the read-only identity is the boundary).
-BASELINE = {
-    "extraKnownMarketplaces": MARKETPLACES,
-    "enabledPlugins": {"1xops@1ops": True, "operations@knowledge-work-plugins": True},
-    "permissions": {
-        "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"],
-        "ask": [
-            "Bash(git push *)",
-            "Bash(git reset --hard *)",
-            "Bash(git tag *)",
-            "Bash(gh pr merge *)",
-            "Bash(gh release *)",
-            "Bash(terraform apply *)",
-            "Bash(terraform destroy *)",
-            "Bash(aws * create-*)",
-            "Bash(aws * delete-*)",
-            "Bash(aws * put-*)",
-            "Bash(aws * update-*)",
-            "Bash(aws * modify-*)",
-            "Bash(aws * terminate-*)",
-            "Bash(aws * start-*)",
-            "Bash(aws * stop-*)",
-            "Bash(aws * attach-*)",
-            "Bash(aws * detach-*)",
-            "Bash(aws * tag-*)",
-            "Bash(aws * untag-*)",
-            "Bash(aws s3 cp *)",
-            "Bash(aws s3 mv *)",
-            "Bash(aws s3 rm *)",
-            "Bash(aws s3 sync *)",
-            "Bash(aws cloudformation deploy *)",
-            "Bash(az * create*)",
-            "Bash(az * delete*)",
-            "Bash(az * update*)",
-            "Bash(az * start*)",
-            "Bash(az * stop*)",
-            "Bash(az * restart*)",
-            "Bash(az * deallocate*)",
-            "Bash(az * assign*)",
-            "Bash(az * add*)",
-            "Bash(az * remove*)",
-            "Bash(az * import*)",
-            "Bash(az * invoke*)",
-            "Bash(az rest *)",
-        ],
-    },
-}
+
+def template_dir() -> Path:
+    """The scope templates: next to this file when installed, else the repository's templates/settings."""
+    packaged = Path(__file__).parent / "templates" / "settings"
+    return (
+        packaged
+        if packaged.is_dir()
+        else Path(__file__).resolve().parents[4] / "templates" / "settings"
+    )
+
+
+def template(scope: str) -> dict:
+    """The settings a scope receives: org, team, local or personal."""
+    return json.loads((template_dir() / f"{scope}.json").read_text())
+
+
+def __getattr__(name: str):
+    """BASELINE: the team rules, for callers that read them as a constant."""
+    if name == "BASELINE":
+        return template("team")
+    raise AttributeError(name)
 
 
 def managed_dir() -> Path:

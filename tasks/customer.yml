@@ -1,0 +1,38 @@
+# tasks/customer.yml - for the person who uses 1xops on their own cloud and tools. Read-only; nothing changes without --yes.
+version: '3'
+
+tasks:
+  uv:
+    internal: true
+    silent: true
+    preconditions:
+      - sh: command -v uvx >/dev/null
+        msg: 'Install uv first: https://docs.astral.sh/uv/getting-started/installation/'
+
+  doctor:
+    deps: [uv]
+    desc: '🩺 Am I ready? Tools, sign-in and read-only access, account IDs masked'
+    summary: |
+      Business value: shows what is missing before the first cloud call, so nobody works on the wrong account or with write access.
+      Scenario: a new engineer joins the on-call rota and needs to know whether their laptop is ready for read-only AWS and Azure work.
+    cmds: ['{{.PY}} doctor']
+
+  setup:
+    deps: [uv]
+    desc: '🧭 Guided setup: writes .env.1xops and shows every change before it is made'
+    summary: |
+      Business value: a first working setup in minutes, for an organisation, a team, a project or one person (story 1XOPS-008).
+      Scenario: a platform lead prepares a tenant folder for a new customer and answers the questions once.
+    interactive: true
+    cmds: ['{{.PY}} setup']
+
+  config:
+    deps: [uv]
+    desc: '⚙️  Apply my settings; a preview unless YES=1'
+    summary: |
+      Business value: nothing is written until a person says yes, and the exact change is shown first.
+      Scenario: before changing the team's shared settings, review the diff, then run: task config YES=1
+    cmds: ['{{.PY}} config --file .env.1xops {{if .YES}}--yes{{end}}']
+    preconditions:
+      - sh: test -f .env.1xops
+        msg: 'No .env.1xops here: run task setup first'

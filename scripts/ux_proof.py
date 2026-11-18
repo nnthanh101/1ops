@@ -33,17 +33,20 @@ TAG = os.environ.get("UX_TAG", "local")  # one image pair per folder (tests/Task
 IMAGES = {"PyPI": f"1xops-ux:py-{TAG}", "npm": f"1xops-ux:js-{TAG}"}
 # Answers a first-time customer gives: a team folder, AWS and Jira, no own profile, write the file, don't apply.
 WIZARD = [
-    ("Scope", "team"), ("Project or tenant folder", "."), ("Add aws", "y"), ("AWS_REGION", "ap-southeast-2"),
+    ("Scope", "team"), ("Tenant folder", "."), ("Add aws", "y"), ("AWS_REGION", "ap-southeast-2"),
     ("Add azure", "n"), ("Add itsm", "y"), ("Your own profile", ""), ("Write", "y"), ("Show every line", "n"),
-    ("Apply them now", "n"),
+    ("Apply them now", "n"), ("Connect and verify", "n"),
 ]
+# A tenant folder with one connector that is not set up, so the session-start check has something to name.
+TENANT = "printf 'ONEXOPS_SCOPE=team\\nONEXOPS_CONNECTORS=aws\\n' > .env.1xops && "
 RUNS = [  # name, shell command in the container, answers, expected exit codes
     ("doctor-first-run", "1xops doctor", [], {0, 1}),
     ("setup-then-check", "1xops setup && 1xops doctor", WIZARD, {0, 1}),
+    ("doctor-brief", TENANT + "1xops doctor --brief", [], {0}),
     ("profiles", "1xops profiles", [], {0}),
     ("config-preview", "1xops config --scope team --dir . --connectors aws itsm", [], {0}),
 ]
-PIPED = ["1xops doctor", "1xops profiles", "1xops config --scope team --dir . --connectors aws itsm"]
+PIPED = ["1xops doctor", TENANT + "1xops doctor --brief", TENANT + "1xops doctor --hook --within 4", "1xops profiles", "1xops config --scope team --dir . --connectors aws itsm"]
 
 
 def docker(image: str, cmd: str, tty: bool, name: str = "") -> list[str]:

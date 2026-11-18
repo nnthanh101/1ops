@@ -1,4 +1,4 @@
-# 1xops 🧰 Cloud & AI Operations ⚙️
+# 🥇 ONE 🧰 Cloud & AI Operations ⚙️
 
 **Reduce cloud and AI costs. Automate operational work. Keep your team in control.**
 
@@ -18,12 +18,11 @@
 
 | Outcome | For | Milestone |
 |---|---|---|
-| The top 3 AWS savings, each with \$/month and where the figure came from | CTOs, cloud leads | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
-| The same for Azure subscriptions | Engineering leads | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
-| A change request ready for your change board, from a real Terraform plan | Change managers | [v0.4](https://github.com/nnthanh101/1xops/milestone/3) |
-| Last month's AI spend by team and vendor | FinOps leads | [v0.4](https://github.com/nnthanh101/1xops/milestone/3) |
-| Runbooks that wait for a person's yes at each step and keep a record | On-call engineers | [v0.5](https://github.com/nnthanh101/1xops/milestone/4) |
-| The weekly status report, straight from the project board | Delivery leads | [v0.5](https://github.com/nnthanh101/1xops/milestone/4) |
+| Every session starts by naming the broken connectors, with the fix | SREs, on-call engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| The assistant asks before any AWS or Azure write, or a call on an expired sign-in or the wrong account | Cloud engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| Runbooks, change requests, status reports and risk assessments from your own tools, read-only, in 15 minutes | Platform engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+
+Cost checks, change requests from a Terraform plan, AI spend, evidenced runbooks and status from the project board are in the enterprise edition at [shop.oceansoft.io](https://shop.oceansoft.io).
 
 ## Get started
 
@@ -33,7 +32,7 @@ uv tool install 1xops     # or: npm install -g 1xops  (Node.js only, no Python)
 1xops setup               # choose connectors; every change is shown before it is written
 ```
 
-Then, in your assistant, run `/1xops:check`.
+Then, in your assistant, run `/1xops:check`. Free and included: `/1xops:tenant-setup` for one settings file per tenant, then `/1xops:change-request`, `/1xops:vendor-review`, `/1xops:process-doc`, `/1xops:capacity-plan` and `/1xops:compliance-tracking`, each drafted for that tenant and filed only after your yes.
 
 **Upgrade to the enterprise edition:** buy it at [shop.oceansoft.io](https://shop.oceansoft.io), download the bundle from your order, then run `1xops install --edition enterprise --file 1xops-enterprise-x.y.z.tar.gz --yes`. Same `/1xops:*` names, one plugin: the free edition is replaced, nothing to relearn. `1xops doctor` shows the installed edition. It shows each connector as **ready**, **signed out** or **missing**, with the exact fix, and changes nothing. The same check runs on the command line as `1xops doctor`. See [setup](docs/setup.md).
 

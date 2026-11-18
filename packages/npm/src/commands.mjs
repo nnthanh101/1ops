@@ -1,10 +1,11 @@
 // The 1xops commands: doctor, install, config, env, profiles, setup. Same behaviour as the Python
 // package (packages/python/src/one_xops/cli.py and setup.py). Nothing changes unless --yes is given.
-import { spawnSync } from 'node:child_process';
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path, { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { fileURLToPath } from 'node:url';
 import { styleText } from 'node:util';
 import * as cf from './config-file.mjs';
 import * as s from './settings.mjs';
@@ -24,8 +25,18 @@ export function which(cmd) {
   return null;
 }
 
+export class OutOfTime extends Error {}
+let deadline = null; // set only while a session-start check runs
+
 export function run(cmd, args, timeout = 20000) {
-  const p = spawnSync(cmd, args, { encoding: 'utf8', timeout });
+  let limit = timeout;
+  if (deadline !== null) { // each call gets only the time that is left
+    const left = deadline - Date.now();
+    if (left <= 0) throw new OutOfTime();
+    limit = Math.min(timeout, left);
+  }
+  const p = spawnSync(cmd, args, { encoding: 'utf8', timeout: limit });
+  if (p.error?.code === 'ETIMEDOUT' && limit < timeout) throw new OutOfTime();
   if (p.error) return { code: 1, out: String(p.error.message) };
   return { code: p.status ?? 1, out: (p.stdout || p.stderr || '').trim() };
 }
@@ -157,7 +168,7 @@ export function azureAccess(roles = []) {
 }
 const AZURE_ACCESS = { read: 'read-only', write: 'can change things: use a read-only (Reader) identity', unknown: 'access unknown: use a read-only (Reader) identity' };
 
-function awsConnector(v, values) {
+export function awsConnector(v, values) {
   const name = `aws ${v}`;
   const profile = values[v] || process.env[v] || '';
   if (!profile) return [name, 'missing', `set ${v} in .env.1xops or the shell (1xops setup)`];
@@ -166,14 +177,25 @@ function awsConnector(v, values) {
   if (code !== 0) return [name, ...awsFix(out, profile)];
   let id;
   try { id = JSON.parse(out); } catch { return [name, 'check', 'AWS identity call returned no account']; }
+  const account = id.Account ?? '';
+  const expected = v.endsWith('_PROFILE') ? values[v.replace('_PROFILE', '_ACCOUNT')] || '' : '';
+  if (expected && account !== expected) return [name, 'wrong account', `profile ${profile} is ${mask(account)}, this tenant expects ${mask(expected)}: aws configure sso --profile ${profile}`];
   const access = accessFromRole(id.Arn ?? '');
-  return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(id.Account ?? '')}, ${ACCESS[access]}`];
+  return [name, access === 'read' ? 'ready' : 'check', `profile ${profile}, account ${mask(account)}, ${ACCESS[access]}`];
 }
 
-function azureConnector() {
+export function azureConnector(values = {}) {
   if (!which('az')) return ['azure', 'missing', 'install the Azure CLI'];
   const who = run('az', ['account', 'show', '--query', 'user.name', '--output', 'tsv']);
   if (who.code !== 0 || !who.out) return ['azure', 'signed out', 'az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR'];
+  const wantTenant = values.AZURE_TENANT_ID || '';
+  const wantSub = values.AZURE_SUBSCRIPTION_ID || '';
+  if (wantTenant || wantSub) {
+    const ids = run('az', ['account', 'show', '--query', '[tenantId,id]', '--output', 'tsv']);
+    const [tenant = '', sub = ''] = ids.code === 0 ? ids.out.split('\t') : [];
+    if (wantTenant && tenant && tenant !== wantTenant) return ['azure', 'wrong account', `tenant is ${mask(tenant)}, this tenant expects ${mask(wantTenant)}: az login --tenant <AZURE_TENANT_ID>`];
+    if (wantSub && sub && sub !== wantSub) return ['azure', 'wrong account', `subscription is ${mask(sub)}, this tenant expects ${mask(wantSub)}: az account set --subscription <AZURE_SUBSCRIPTION_ID>`];
+  }
   const roles = run('az', ['role', 'assignment', 'list', '--assignee', who.out, '--all', '--query', '[].roleDefinitionName', '--output', 'json'], 60000);
   let names = [];
   try { names = roles.code === 0 ? JSON.parse(roles.out) : []; } catch { /* not JSON */ }
@@ -181,13 +203,33 @@ function azureConnector() {
   return ['azure', access === 'read' ? 'ready' : 'check', AZURE_ACCESS[access]];
 }
 
+const GITHUB_WRITE = /^(repo|public_repo|workflow|gist|delete_repo|codespace|write:.*|admin:.*)$/;
+// GitHub sign-in of the gh CLI: ready only when the token cannot change things. Prints no token.
+export function githubConnector() {
+  if (!which('gh')) return ['github', 'missing', 'install the GitHub CLI'];
+  const { code, out } = run('gh', ['auth', 'status']);
+  if (code !== 0) return ['github', 'signed out', 'gh auth login --web'];
+  const user = out.match(/account (\S+)/);
+  const who = user ? `signed in as ${user[1]}` : 'signed in';
+  const scopes = out.match(/Token scopes:\s*(.+)/);
+  if (!scopes) return ['github', 'check', `${who}; a fine-grained token's access cannot be read from here: give it read-only repository access`];
+  const quoted = [...scopes[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const names = quoted.length ? quoted : scopes[1].replace(/ /g, '').split(',');
+  const writes = names.filter((n) => GITHUB_WRITE.test(n));
+  if (writes.length) return ['github', 'check', `${who}; the token can change things (${writes.join(', ')}): use a fine-grained read-only token`];
+  return ['github', 'ready', `${who}, read-only scopes`];
+}
+
 // [connector, status, fix] for each connector in .env.1xops. Read-only identity calls only.
-export function checkConnectors(file) {
-  if (!existsSync(file)) return [['connectors', 'missing', `no ${file} here: run 1xops setup`]];
+// Rows are added to `rows` as they are found, so a check that runs out of time keeps what it has.
+export function checkConnectors(file, rows = []) {
+  if (!existsSync(file)) { rows.push(['connectors', 'missing', `no ${file} here: run 1xops setup`]); return rows; }
   let cfg;
-  try { cfg = cf.load(file); } catch (err) { return [['connectors', 'missing', err.message]]; }
-  if (!Object.keys(cfg.connectors).length) return [['connectors', 'missing', `ONEXOPS_CONNECTORS is empty in ${file}: run 1xops setup`]];
-  const rows = [];
+  try { cfg = cf.load(file); } catch (err) { rows.push(['connectors', 'missing', err.message]); return rows; }
+  for (const key of ['AWS_CONFIG_FILE', 'AZURE_CONFIG_DIR']) { // this tenant's own, never another tenant's from the shell
+    if (cfg.values[key]) process.env[key] = cfg.values[key].replace(/^~(?=$|\/)/, homedir());
+  }
+  if (!Object.keys(cfg.connectors).length) { rows.push(['connectors', 'missing', `ONEXOPS_CONNECTORS is empty in ${file}: run 1xops setup`]); return rows; }
   for (const connector of Object.keys(cfg.connectors)) {
     let servers;
     try { servers = s.loadProfile(connector).mcpServers; } catch (err) { rows.push([connector, 'missing', err.message]); continue; }
@@ -200,25 +242,95 @@ export function checkConnectors(file) {
       else if (server.type === 'http') rows.push([serverName, 'check', `signs in inside the host: run /mcp and choose ${serverName}`]);
       else rows.push([serverName, 'check', 'no sign-in check for this connector']);
     }
-    rows.push(...[...new Set(awsVars)].map((v) => awsConnector(v, cfg.values)));
-    if (azure) rows.push(azureConnector());
+    for (const v of new Set(awsVars)) rows.push(awsConnector(v, cfg.values));
+    if (azure) rows.push(azureConnector(cfg.values));
   }
   return rows;
 }
 
-const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow' };
+const ENV_FIX = 'in .env.1xops, then start the assistant from a shell that ran eval "$(1xops env)"';
+
+// [server (plugin), status, fix] for the servers of the installed 1xops plugin and of the operations plugin it
+// depends on, from the host's own plugin records. Reads no token, makes no call.
+export function pluginConnectors() {
+  const folder = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(homedir(), `.${s.HOST}`), 'plugins');
+  let installed;
+  try { installed = JSON.parse(readFileSync(path.join(folder, 'installed_plugins.json'), 'utf8')).plugins ?? {}; } catch { return []; }
+  const rows = [];
+  for (const [key, entries] of Object.entries(installed)) {
+    const plugin = key.split('@')[0];
+    if (plugin !== '1xops' && key !== 'operations@knowledge-work-plugins') continue;
+    let servers;
+    try {
+      const data = JSON.parse(readFileSync(path.join(entries[0].installPath, '.mcp.json'), 'utf8'));
+      servers = Object.entries(data.mcpServers ?? data);
+    } catch { continue; }
+    for (const [name, server] of servers) {
+      if (typeof server !== 'object' || server === null || Array.isArray(server)) continue;
+      const label = `${name} (${plugin})`;
+      const unset = [...new Set([...JSON.stringify(server).matchAll(/\$\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]))].filter((v) => !v.startsWith('CLAUDE_') && !process.env[v]);
+      if (unset.length) rows.push([label, 'broken', `${unset.join(', ')} not set. Fix: put ${unset.map((v) => `${v}=<value>`).join(', ')} ${ENV_FIX}`]);
+      else if ('url' in server && !String(server.url).trim()) rows.push([label, 'not connected', "no server. Fix: connect it in the assistant's connector settings, or list it in ONEXOPS_IGNORE in .env.1xops"]);
+      else rows.push([label, 'in host', `signs in inside the host: run /mcp and choose ${name}`]);
+    }
+  }
+  return rows;
+}
+
+// The tenant's connectors and the plugin servers, minus the names in ONEXOPS_IGNORE.
+export function connectorRows(file, rows) {
+  let values = {};
+  try { values = cf.load(file).values; } catch { /* no file: nothing to ignore */ }
+  const ignore = new Set((values.ONEXOPS_IGNORE ?? '').split(',').map((n) => n.trim()).filter(Boolean));
+  try {
+    rows.push(...pluginConnectors());
+    checkConnectors(file, rows);
+  } finally {
+    const keep = rows.filter((r) => !ignore.has(r[0]) && !ignore.has(r[0].split(' (')[0]));
+    rows.length = 0;
+    rows.push(...keep);
+  }
+  return rows;
+}
+
+const SKIP_AT_START = ['ready', 'in host'];
+const QUIET = ['signs in inside the host', 'no sign-in check'];
+
+// Session start: one line per connector that is not ready, with its fix. Nothing when all is ready.
+// Never throws; a check that runs out of time or fails adds one line saying so.
+export function briefText(file, within) {
+  const rows = [];
+  let done = true;
+  deadline = within == null ? null : Date.now() + within * 1000;
+  try {
+    if (existsSync(file)) connectorRows(file, rows); // not a tenant folder: nothing to say
+  } catch { done = false; } finally { deadline = null; }
+  const lines = rows.filter(([, status, fix]) => !SKIP_AT_START.includes(status) && !QUIET.some((q) => fix.startsWith(q))).map(([name, , fix]) => `${name}: ${scrub(fix)}`);
+  if (!done) lines.push(`1xops: the check did not finish${within == null ? '' : ` in ${within} s`}; run 1xops doctor for the rest.`);
+  return lines.join('\n');
+}
+
+function brief(opts) {
+  const text = briefText(opts.file, opts.within);
+  if (text && opts.hook) console.log(JSON.stringify({ systemMessage: text, hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } }));
+  else if (text) console.log(text);
+  return 0;
+}
+
+const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow', broken: 'red', 'not connected': 'yellow', 'wrong account': 'red', 'in host': 'dim' };
 
 export function doctor(opts, version) {
+  if (opts.brief || opts.hook) return brief(opts);
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
   const rows = [...checkTools(), checkEdition(), ...checkSignIn(opts['aws-profile'])];
-  const connectors = checkConnectors(opts.file);
+  const connectors = connectorRows(opts.file, []);
   if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
   shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
   // Required tools and configured connectors that are not ok or ready. Optional tools stay in the table only.
-  const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[1] !== 'optional');
+  const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[2] !== 'in host' && r[1] !== 'optional');
   for (const r of shown) r[2] = color(RESULT_STYLE[r[2]], r[2]);
   table(`1xops ${version} doctor`, ['check', 'needed', 'result', 'detail'], shown);
   // What to do next, in table order (see todo above).
@@ -344,7 +456,8 @@ function write(file, data) {
 function resolveConfig(opts) {
   if (opts.file) {
     const cfg = cf.load(opts.file);
-    return { scope: cfg.scope, project: path.resolve(cfg.dir), out: cfg.out ? path.resolve(cfg.out) : null, connectors: cfg.connectors };
+    const base = path.dirname(path.resolve(opts.file)); // a relative folder means: relative to this file
+    return { scope: cfg.scope, project: path.resolve(base, cfg.dir), out: cfg.out ? path.resolve(base, cfg.out) : null, connectors: cfg.connectors };
   }
   return {
     scope: opts.scope,
@@ -365,7 +478,7 @@ export function config(opts) {
   }
   const personal = scope === 'local' || scope === 'personal';
   let servers = {};
-  let wanted = s.BASELINE;
+  let wanted = s.template(scope);
   for (const [profile, values] of profiles) {
     // Shared files keep ${VAR}; private host config gets the person's values.
     Object.assign(servers, personal ? cf.substitute(profile.mcpServers, values) : profile.mcpServers);
@@ -422,6 +535,31 @@ export function config(opts) {
 
 const shellQuote = (v) => (/^[A-Za-z0-9@%+=:,./_-]+$/.test(v) ? v : `'${v.replaceAll("'", `'"'"'`)}'`);
 
+// One line per tenant folder (a folder with its own .env.1xops) under a folder. Changes nothing.
+export async function tenants(opts) {
+  const root = opts.folder ?? '.';
+  let folders = [];
+  try {
+    folders = readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(root, d.name, cf.DEFAULT_FILE))).map((d) => d.name).sort();
+  } catch { /* not a folder */ }
+  if (!folders.length) { console.log(`No tenant folders (a folder with its own ${cf.DEFAULT_FILE}) under ${root}.`); return 0; }
+  const bin = join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', '1xops.mjs');
+  const results = await Promise.all(folders.map((name) => new Promise((resolve) => {
+    const child = spawn(process.execPath, [bin, 'doctor', '--brief', '--within', '8'], { cwd: join(root, name) });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    child.on('close', () => resolve([name, out.split('\n').filter((l) => l.trim())]));
+  })));
+  let need = 0;
+  for (const [name, lines] of results) {
+    if (lines.length) { need += 1; console.log(`✗ ${name}: ${scrub(lines[0])}${lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}`); }
+    else console.log(`✓ ${name}: ready`);
+  }
+  console.log(`${folders.length} tenants, ${need} need attention`);
+  return 0;
+}
+
 export function env(opts) {
   let cfg;
   try {
@@ -447,6 +585,18 @@ export function profiles() {
 // ── setup ───────────────────────────────────────────────────────────────────
 
 // Read-only lookups that make good defaults: AWS profiles and region, current Azure account.
+const awsConfigFile = () => process.env.AWS_CONFIG_FILE || join(homedir(), '.aws', 'config');
+const DEFAULTS = { AWS_REGION: 'ap-southeast-2' }; // Sydney; a region is not a secret
+
+// (name, subscription id, tenant id) of the subscriptions the read-only identity in AZURE_CONFIG_DIR can see. Read from its
+// local sign-in, no cloud call. Without AZURE_CONFIG_DIR nothing is read: the default login is never used.
+function azureSubscriptions() {
+  if (!process.env.AZURE_CONFIG_DIR || !which('az')) return [];
+  const r = run('az', ['account', 'list', '--query', '[].{n:name,s:id,t:tenantId}', '--output', 'json']);
+  if (r.code !== 0 || !r.out) return [];
+  try { return JSON.parse(r.out).map((a) => [a.n, a.s, a.t]); } catch { return []; }
+}
+
 function detect() {
   const found = {};
   const ok = (cmd, args) => (which(cmd) ? run(cmd, args) : { code: 1, out: '' });
@@ -469,7 +619,7 @@ function detect() {
 // (name, masked account, role) of AWS profiles whose configured role cannot change things. Read from the local AWS
 // config only: no cloud call. Unknown and can-change profiles are left out.
 export function readOnlyProfiles() {
-  const cfg = process.env.AWS_CONFIG_FILE || join(homedir(), '.aws', 'config');
+  const cfg = awsConfigFile();
   if (!existsSync(cfg)) return [];
   const found = [];
   let name = '';
@@ -499,6 +649,21 @@ const SCOPE_HELP = {
   personal: 'you, in every project',
 };
 
+// The starter note of a tenant's docs folder: front matter that follows the wiki's contract, so the folder can be
+// opened in Obsidian and rendered by Docusaurus as it is.
+const slug = (name) => {
+  const s = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
+  return /^[a-z][a-z0-9-]{1,62}$/.test(s) ? s : `tenant-${s}`.slice(0, 63);
+};
+const tenantNote = (name, connectors) => `---\nid: ${slug(name)}\ntitle: ${name}\ntype: entity\nstatus: emerging\n`
+  + `last_updated: ${new Date().toLocaleDateString('en-CA')}\nsources: []\ntags: [tenant]\n---\n\n# ${name}\n\n`
+  + 'What this tenant runs, who owns it, and where its runbooks are.\n\n'
+  + '- Owner: (add a name or team)\n'
+  + `- Connectors: ${connectors.join(', ') || '(none yet)'}\n`
+  + '- Runbooks go in `runbooks/` (type: runbook), postmortems in `reviews/` (type: review), '
+  + 'services and systems in `entities/` (type: entity), decisions in `decisions/` (type: decision).\n\n'
+  + 'Notes may name things: profiles, accounts masked as ****1234. They never hold keys, tokens or passwords.\n';
+
 export async function setup(opts) {
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
   const lines = rl[Symbol.asyncIterator]();
@@ -513,20 +678,72 @@ export async function setup(opts) {
     return a.startsWith('y');
   };
   try {
-    const file = opts.file;
+    let file = opts.file;
     console.log(`${color('bold', '1xops setup')} — non-secret values only; secrets stay in your sign-in.\n`);
     table('Who the settings are for', ['scope', 'for'], s.SCOPES.map((n) => [n, SCOPE_HELP[n]]));
     let scope;
     do scope = await ask(`Scope (${s.SCOPES.join('/')})`, 'team'); while (!s.SCOPES.includes(scope));
     const conf = { scope };
-    if (scope === 'team' || scope === 'local') conf.dir = await ask('Project or tenant folder', '.');
+    if (scope === 'team' || scope === 'local') {
+      const folder = await ask(`Tenant folder (Enter = this folder: ${process.cwd()})`, '.');
+      if (file === cf.DEFAULT_FILE) { // the tenant's settings file lives in the tenant's folder
+        file = join(folder, cf.DEFAULT_FILE);
+        conf.dir = '.';
+      } else conf.dir = folder;
+    }
     if (scope === 'org') conf.out = await ask('Folder to write the managed files to', '.');
     const found = detect();
     const connectors = {};
     let listed = false;
+    let azureShown = false;
+    const picked = {};
+    const home = (p) => (p.startsWith(`${homedir()}/`) ? `~${p.slice(homedir().length)}` : p);
+    const pickAwsConfig = async () => {
+      if (process.env.AWS_CONFIG_FILE) return { AWS_CONFIG_FILE: home(process.env.AWS_CONFIG_FILE) };
+      const root = join(homedir(), '.aws', 'tenants');
+      let options = [];
+      try { options = readdirSync(root).sort().map((n) => [n, join(root, n, 'config')]).filter(([, f]) => existsSync(f)); } catch { /* none */ }
+      if (!options.length) return {};
+      table(`AWS config files, one per tenant (${options.length})`, ['#', 'tenant', 'file'], options.map(([n, f], i) => [String(i + 1), n, home(f)]));
+      for (;;) {
+        const pick = (await ask('  AWS_CONFIG_FILE: number or part of a tenant name (Enter skips)')).trim();
+        if (!pick || pick === '-') return {};
+        const hits = /^\d+$/.test(pick) ? (options[Number(pick) - 1] ? [options[Number(pick) - 1]] : []) : options.filter(([n]) => n.toLowerCase().includes(pick.toLowerCase()));
+        if (hits.length === 1) { process.env.AWS_CONFIG_FILE = hits[0][1]; return { AWS_CONFIG_FILE: home(hits[0][1]) }; }
+        console.log(`  No single tenant matches '${pick}': pick 1 to ${options.length}.`);
+      }
+    };
+    const askSubscription = async () => {
+      const rows = azureSubscriptions();
+      if (!rows.length) {
+        if (!azureShown) {
+          console.log('  No Azure Reader sign-in found. Use a Reader identity in its own folder, never your own login:');
+          console.log('    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again. Or type the ID now.');
+          azureShown = true;
+        }
+        return ask('  AZURE_SUBSCRIPTION_ID (blank to skip)', process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '');
+      }
+      table(`Azure subscriptions of the Reader identity (${rows.length})`, ['#', 'name', 'subscription', 'tenant'], rows.map(([n, s, t], i) => [String(i + 1), n, `****${s.slice(-4)}`, `****${t.slice(-4)}`]));
+      const current = process.env.AZURE_SUBSCRIPTION_ID || found.AZURE_SUBSCRIPTION_ID || '';
+      const cur = rows.findIndex((r) => r[1] === current) + 1;
+      const hint = cur ? `Enter keeps ${cur}, - skips` : 'Enter skips';
+      for (;;) {
+        const pick = (await ask(`  AZURE_SUBSCRIPTION_ID: number or part of a name (${hint})`, cur ? String(cur) : '')).trim();
+        if (!pick || pick === '-') return '';
+        let chosen = /^\d+$/.test(pick) ? rows[Number(pick) - 1] : null;
+        if (!chosen && !/^\d+$/.test(pick)) {
+          const hits = rows.filter((r) => r[0].toLowerCase().includes(pick.toLowerCase()));
+          if (hits.length === 1) [chosen] = hits;
+        }
+        if (chosen) { picked.tenant = chosen[2]; return chosen[1]; }
+        console.log(`  No single subscription matches '${pick}': pick 1 to ${rows.length}.`);
+      }
+    };
     for (const name of s.builtinProfiles()) {
       const profile = s.loadProfile(name);
       if (!(await yes(`Add ${name}: ${profile.description ?? ''}?`, false))) continue;
+      if (name === 'aws') conf.extra = { ...conf.extra, ...(await pickAwsConfig()) };
+      if (name === 'azure' && process.env.AZURE_CONFIG_DIR) conf.extra = { ...conf.extra, AZURE_CONFIG_DIR: home(process.env.AZURE_CONFIG_DIR) };
       const values = {};
       for (const v of cf.variables(profile)) {
         if (v.endsWith('_PROFILE')) {
@@ -535,9 +752,10 @@ export async function setup(opts) {
           const options = readOnlyProfiles();
           if (!options.length) {
             if (!listed) { // say it once, not once per variable
-              console.log('  No read-only AWS profile in ~/.aws/config yet.');
+              console.log(`  No read-only AWS profile in ${awsConfigFile()} yet.`);
               console.log('  Create one with: aws configure sso (a role such as ReadOnlyAccess).');
-              console.log('  Until then /1xops:check shows this connector as missing.');
+              console.log('  Profiles in another file? Run: AWS_CONFIG_FILE=<file> 1xops setup');
+              console.log('  Until then 1xops doctor shows this connector as missing.');
               listed = true;
             }
             continue;
@@ -563,7 +781,18 @@ export async function setup(opts) {
           }
           continue;
         }
-        const value = await ask(`  ${v} (blank to skip)`, process.env[v] || found[v] || '');
+        if (v === 'AZURE_SUBSCRIPTION_ID') {
+          const sub = await askSubscription();
+          if (sub) values[v] = sub;
+          continue;
+        }
+        if (v === 'AZURE_TENANT_ID' && picked.tenant) {
+          console.log('  AZURE_TENANT_ID: taken from the subscription.');
+          values[v] = picked.tenant;
+          continue;
+        }
+        const def = process.env[v] || found[v] || DEFAULTS[v] || '';
+        const value = await ask(def ? `  ${v}` : `  ${v} (blank to skip)`, def);
         if (value) values[v] = value;
       }
       connectors[name] = values;
@@ -578,13 +807,49 @@ export async function setup(opts) {
     if (!(await yes(`Write ${file}?`, true))) return 1;
     write(file, text);
     cf.load(file); // same checks as `1xops config --file`
+    if (scope === 'team' || scope === 'local') {
+      const note = join(path.dirname(file), 'docs', 'tenant.md');
+      if (!existsSync(note)) {
+        write(note, tenantNote(path.basename(path.resolve(path.dirname(file))), Object.keys(connectors)));
+        console.log(`Wrote ${note}: this tenant's notes. Open the docs folder in Obsidian.`);
+      }
+    }
 
     console.log('\nChanges this would make:');
     if (config({ file, preview: 'summary' }) !== 0) return 2;
     if (await yes('Show every line first?', false)) config({ file, preview: 'full' });
-    if (await yes('Apply them now?', false)) return config({ file, yes: true });
-    console.log(`Apply later with: 1xops config --file ${file} --yes`);
-    return 0;
+    let code = 0;
+    if (await yes('Apply them now?', false)) code = config({ file, yes: true });
+    else console.log(`Apply later with: 1xops config --file ${file} --yes`);
+    if (code === 0 && Object.keys(connectors).length && (await yes("Connect and verify now? (signs in with each provider's own command)", true))) {
+      console.log('\nConnect: sign in, then check that access is read-only.');
+      const verify = async (label, check, login) => {
+        const show = (row) => console.log(`  ${row[1] === 'ready' ? '✓' : '✗'} ${label}: ${scrub(row[2])}`);
+        let row = check();
+        show(row);
+        if (row[1] === 'signed out' && which(login[0]) && (await yes(`  Sign in now? (${login.join(' ')}; opens your browser)`, true))) {
+          spawnSync(login[0], login.slice(1), { stdio: 'inherit' });
+          row = check();
+          show(row);
+        }
+      };
+      for (const [name, values] of Object.entries(connectors)) {
+        if (name === 'aws') {
+          for (const v of ['AWS_BILLING_PROFILE', 'AWS_OPERATIONS_PROFILE']) {
+            const p = values[v];
+            if (p) await verify(`aws ${v}`, () => awsConnector(v, { [v]: p }), ['aws', 'sso', 'login', '--profile', p]);
+          }
+        } else if (name === 'azure') {
+          if (!process.env.AZURE_CONFIG_DIR) console.log('  azure: use a Reader identity in its own folder (AZURE_CONFIG_DIR), then run setup again.');
+          else await verify('azure', () => azureConnector(values), ['az', 'login']);
+        } else if (name === 'itsm') {
+          console.log('  itsm: sign in inside the assistant: start it in this folder, run /mcp and choose atlassian.');
+          if (which('claude') && (await yes('  Start the assistant here now to sign in? (claude)', false))) spawnSync('claude', [], { stdio: 'inherit' });
+        }
+      }
+      await verify('github', githubConnector, ['gh', 'auth', 'login', '--web', '--hostname', 'github.com']);
+    }
+    return code;
   } finally {
     rl.close();
   }

@@ -12,12 +12,14 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 const HELP = `Usage: 1xops <command> [options]
 
   doctor     check prerequisites, sign-in and connectors    [--aws-profile NAME] [--file PATH]
+                                                             [--brief] [--hook] [--within SECONDS]
   install    add the marketplaces and install the plugin    [--scope user|project|local] [--edition free|enterprise]
                                                              [--file BUNDLE] [--yes]
   setup      guided setup: asks questions, writes ${DEFAULT_FILE}   [--file PATH]
   config     write settings and connectors for a scope      [--scope ${SCOPES.join('|')}] [--dir DIR]
                                                              [--out DIR] [--connectors NAME...] [--file PATH] [--yes]
   env        print export lines for the values in ${DEFAULT_FILE}    [--file PATH]
+  tenants    status of every tenant folder under a folder  [FOLDER]
   profiles   list built-in connector profiles
 
 Nothing changes unless you pass --yes.`;
@@ -34,7 +36,7 @@ if (!command || command === '--help' || command === '-h') {
 }
 
 const OPTIONS = {
-  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE } },
+  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE }, brief: { type: 'boolean', default: false }, hook: { type: 'boolean', default: false }, within: { type: 'string' } },
   install: { scope: { type: 'string', default: 'user' }, edition: { type: 'string', default: 'free' }, file: { type: 'string' }, yes: { type: 'boolean', default: false } },
   setup: { file: { type: 'string', default: DEFAULT_FILE } },
   config: {
@@ -47,6 +49,7 @@ const OPTIONS = {
   },
   env: { file: { type: 'string', default: DEFAULT_FILE } },
   profiles: {},
+  tenants: {},
 };
 if (!(command in OPTIONS)) {
   console.error(`1xops: unknown command '${command}'\n\n${HELP}`);
@@ -61,10 +64,19 @@ try {
     if (rest[i] !== '--connectors') { expanded.push(rest[i]); continue; }
     while (i + 1 < rest.length && !rest[i + 1].startsWith('--')) expanded.push('--connectors', rest[++i]);
   }
-  opts = parseArgs({ args: expanded, options: OPTIONS[command], strict: true }).values;
+  const parsed = parseArgs({ args: expanded, options: OPTIONS[command], strict: true, allowPositionals: command === 'tenants' });
+  opts = parsed.values;
+  if (command === 'tenants') opts.folder = parsed.positionals[0];
 } catch (err) {
   console.error(`1xops ${command}: ${err.message}`);
   process.exit(2);
+}
+if (command === 'doctor' && opts.within !== undefined) {
+  opts.within = Number(opts.within);
+  if (!(opts.within >= 0)) {
+    console.error('1xops doctor: --within must be a number of seconds');
+    process.exit(2);
+  }
 }
 if (command === 'config' && !SCOPES.includes(opts.scope)) {
   console.error(`1xops config: --scope must be one of ${SCOPES.join(', ')}`);
@@ -85,6 +97,7 @@ const handlers = {
   setup: () => cmd.setup(opts),
   config: () => cmd.config(opts),
   env: () => cmd.env(opts),
+  tenants: () => cmd.tenants(opts),
   profiles: () => cmd.profiles(),
 };
 process.exit(await handlers[command]());

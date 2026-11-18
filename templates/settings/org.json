@@ -1,0 +1,236 @@
+{
+  "allowManagedPermissionRulesOnly": true,
+  "allowManagedMcpServersOnly": true,
+  "allowedMcpServers": [
+    {
+      "serverName": "awslabs-billing-cost-management"
+    },
+    {
+      "serverName": "awslabs-cloudtrail"
+    },
+    {
+      "serverName": "awslabs-cloudwatch"
+    },
+    {
+      "serverName": "awslabs-well-architected-security"
+    },
+    {
+      "serverName": "azure"
+    },
+    {
+      "serverName": "atlassian"
+    },
+    {
+      "serverName": "plugin:1xops:github"
+    },
+    {
+      "serverName": "plugin:1xops:azure-devops"
+    },
+    {
+      "serverName": "plugin:1xops:atlassian"
+    },
+    {
+      "serverName": "plugin:1xops:notion"
+    },
+    {
+      "serverName": "plugin:1xops:slack"
+    }
+  ],
+  "strictKnownMarketplaces": [
+    {
+      "source": "github",
+      "repo": "nnthanh101/1xops"
+    },
+    {
+      "source": "github",
+      "repo": "anthropics/knowledge-work-plugins"
+    },
+    {
+      "source": "github",
+      "repo": "1xOps/1xops-enterprise"
+    }
+  ],
+  "extraKnownMarketplaces": {
+    "1ops": {
+      "source": {
+        "source": "github",
+        "repo": "nnthanh101/1xops"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "1xops@1ops": true,
+    "operations@knowledge-work-plugins": true
+  },
+  "sandbox": {
+    "enabled": true
+  },
+  "permissions": {
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(~/.aws/credentials)",
+      "Read(~/.aws/sso/cache/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.ssh/**)",
+      "Bash(npm publish *)",
+      "Bash(uv publish *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push origin main *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(aws * create-*)",
+      "Bash(aws * delete-*)",
+      "Bash(aws * put-*)",
+      "Bash(aws * update-*)",
+      "Bash(aws * modify-*)",
+      "Bash(aws * terminate-*)",
+      "Bash(aws * start-*)",
+      "Bash(aws * stop-*)",
+      "Bash(aws * attach-*)",
+      "Bash(aws * detach-*)",
+      "Bash(aws * tag-*)",
+      "Bash(aws * untag-*)",
+      "Bash(aws s3 cp *)",
+      "Bash(aws s3 mv *)",
+      "Bash(aws s3 rm *)",
+      "Bash(aws s3 sync *)",
+      "Bash(aws cloudformation deploy *)",
+      "Bash(az * create*)",
+      "Bash(az * delete*)",
+      "Bash(az * update*)",
+      "Bash(az * start*)",
+      "Bash(az * stop*)",
+      "Bash(az * restart*)",
+      "Bash(az * deallocate*)",
+      "Bash(az * assign*)",
+      "Bash(az * add*)",
+      "Bash(az * remove*)",
+      "Bash(az * import*)",
+      "Bash(az * invoke*)",
+      "Bash(az rest *)",
+      "Bash(aws secretsmanager get-secret-value *)",
+      "Bash(aws ssm get-parameter*)",
+      "Bash(aws kms decrypt *)",
+      "Bash(aws configure export-credentials *)",
+      "Bash(aws ecr get-login-password *)",
+      "Bash(aws sts get-session-token *)",
+      "Bash(aws sts assume-role *)",
+      "Bash(aws * generate-db-auth-token *)",
+      "Bash(az account get-access-token *)",
+      "Bash(az keyvault secret show *)",
+      "Bash(az keyvault secret download *)",
+      "Bash(az storage account keys *)",
+      "Bash(az * list-keys*)",
+      "Bash(az * list-credentials*)",
+      "Bash(az ad sp credential *)",
+      "Bash(az login *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh release delete *)",
+      "Bash(gh repo archive *)",
+      "mcp__playwright__browser_run_code_unsafe",
+      "mcp__playwright-automation__browser_run_code_unsafe"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git tag *)",
+      "Bash(git reset --hard *)",
+      "Bash(git branch -D *)",
+      "Bash(git checkout -b *)",
+      "Bash(git switch -c *)",
+      "Bash(git worktree add *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue edit *)",
+      "Bash(gh issue comment *)",
+      "Bash(gh issue close *)",
+      "Bash(gh issue reopen *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr comment *)",
+      "Bash(gh pr review *)",
+      "Bash(gh pr close *)",
+      "Bash(gh pr edit *)",
+      "Bash(gh release create *)",
+      "Bash(gh release upload *)",
+      "Bash(gh release edit *)",
+      "Bash(gh api *)",
+      "mcp__atlassian__*",
+      "mcp__plugin_1xops_github__*",
+      "mcp__plugin_1xops_azure-devops__*",
+      "mcp__plugin_1xops_atlassian__*",
+      "mcp__plugin_1xops_notion__*",
+      "mcp__plugin_1xops_slack__*",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__computer",
+      "mcp__claude-in-chrome__form_input",
+      "mcp__claude-in-chrome__javascript_tool",
+      "mcp__claude-in-chrome__file_upload",
+      "mcp__claude-in-chrome__upload_image",
+      "mcp__computer-use__left_click",
+      "mcp__computer-use__right_click",
+      "mcp__computer-use__double_click",
+      "mcp__computer-use__triple_click",
+      "mcp__computer-use__left_click_drag",
+      "mcp__computer-use__type",
+      "mcp__computer-use__key",
+      "mcp__computer-use__hold_key",
+      "mcp__computer-use__open_application",
+      "mcp__computer-use__write_clipboard",
+      "mcp__computer-use__request_access",
+      "mcp__playwright__browser_navigate"
+    ],
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(aws sts get-caller-identity *)",
+      "Bash(aws * describe-*)",
+      "Bash(aws * list-*)",
+      "Bash(aws * get-*)",
+      "Bash(aws s3 ls *)",
+      "Bash(az * list*)",
+      "Bash(az * show*)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh repo view *)",
+      "Bash(gh run list *)",
+      "Bash(gh run view *)",
+      "Bash(gh release list *)",
+      "Bash(gh release view *)",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__read_network_requests",
+      "mcp__claude-in-chrome__list_connected_browsers",
+      "mcp__computer-use__screenshot",
+      "mcp__computer-use__zoom",
+      "mcp__computer-use__cursor_position",
+      "mcp__computer-use__list_granted_applications",
+      "mcp__computer-use__wait",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_console_messages"
+    ]
+  }
+}

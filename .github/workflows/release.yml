@@ -109,7 +109,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: docker build -t 1xops:ci packages/python
+      - run: docker build --build-context repo=. -t 1xops:ci packages/python
       - run: docker run --rm 1xops:ci --version
 
   # Publishing starts here: only for a v* tag (or by hand), and only after every test passed on this commit.
@@ -220,6 +220,7 @@ jobs:
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: packages/python
+          build-contexts: repo=.
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: mode=max

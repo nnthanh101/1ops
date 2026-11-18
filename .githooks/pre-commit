@@ -7,16 +7,16 @@ set -uo pipefail
 GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"
 
 scan() { # reads the staged diff on stdin; prints advice; always returns 0
-  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  if ! command -v docker >/dev/null 2>&1 || ! perl -e 'alarm 5; exec @ARGV' docker info >/dev/null 2>&1; then
     echo "pre-commit: advice - Docker is not running, so the staged change was not scanned for secrets"; return 0
   fi
   local out rc
-  out=$(docker run --rm -i "$GITLEAKS_IMAGE" stdin --redact --no-banner --exit-code 1 -v 2>&1); rc=$?
+  out=$(perl -e 'alarm 10; exec @ARGV' docker run --rm -i "$GITLEAKS_IMAGE" stdin --redact --no-banner --exit-code 1 -v 2>&1); rc=$?
   case "$rc" in
     0) ;;
     1) printf '%s\n' "$out" | grep -E "leaks found|RuleID|Line:" | head -12
        echo "pre-commit: advice - gitleaks found a possible secret in the staged change; the commit goes ahead. Unstage it, or rotate it if it is real." ;;
-    *) echo "pre-commit: advice - gitleaks stopped with exit $rc, so the staged change was not scanned" ;;
+    *) echo "pre-commit: advice - the secret scan did not finish (exit $rc, 10-second limit), so the staged change was not scanned" ;;
   esac
   return 0
 }
@@ -43,6 +43,10 @@ if [ "${1:-}" = --self-test ]; then
   else echo "  [skip] the real image: Docker is not running"; fi
   echo "pre-commit self-test: $ok/$n cases as expected"; [ "$ok" = "$n" ]; exit $?
 fi
+
+# Advice for everyone, never a blocker: the owner decides. Switch it off for this clone with
+# `git config git-standard.advice off`; back on with `git config --unset git-standard.advice`.
+[ "$(git config --get git-standard.advice 2>/dev/null)" = off ] && exit 0
 
 git diff --cached --no-color --no-ext-diff | scan
 exit 0

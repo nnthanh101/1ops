@@ -19,6 +19,10 @@ if [ "${1:-}" = --self-test ]; then
   echo "pre-push self-test: $ok/3 cases as expected"; [ "$ok" = 3 ]; exit $?
 fi
 
+# Advice for everyone, never a blocker: the owner decides. Switch it off for this clone with
+# `git config git-standard.advice off`; back on with `git config --unset git-standard.advice`.
+[ "$(git config --get git-standard.advice 2>/dev/null)" = off ] && exit 0
+
 root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 needs_local_ci "$branch" || exit 0

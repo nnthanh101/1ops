@@ -6,6 +6,8 @@
     ONEXOPS_CONNECTORS=aws,itsm        # built-in profiles, or paths to your own .json profiles
     AWS_OPERATIONS_PROFILE=ops-readonly
     AWS_REGION=ap-southeast-2
+    AWS_OPERATIONS_ACCOUNT=123456789012   # optional: the account this tenant expects, else doctor names a wrong one
+    ONEXOPS_IGNORE=gmail,google calendar  # optional: connectors the session start never names
 
 Every other KEY=value line is a value for the ${KEY} references in the connector profiles
 (see `1xops profiles`). Plain KEY=value, so the shell, Python and Node.js all read it natively.
@@ -23,6 +25,7 @@ VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-[^}]*)?\}")
 KEY = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 SECRET_HINTS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY")
 OWN = {"ONEXOPS_SCOPE", "ONEXOPS_DIR", "ONEXOPS_OUT", "ONEXOPS_CONNECTORS"}
+KNOWN = OWN | {"ONEXOPS_IGNORE"}  # IGNORE stays among the values: doctor reads it
 
 
 def variables(profile: dict) -> list[str]:
@@ -65,8 +68,10 @@ def load(path: Path) -> dict:
     """Read and check .env.1xops. Returns {scope, dir, out, connectors: {name: values}, values}."""
     pairs = parse(path.read_text(), str(path))
     for key in pairs:
-        if key.startswith("ONEXOPS_") and key not in OWN:
-            raise ValueError(f"{path}: unknown setting {key}; use one of {', '.join(sorted(OWN))}")
+        if key.startswith("ONEXOPS_") and key not in KNOWN:
+            raise ValueError(
+                f"{path}: unknown setting {key}; use one of {', '.join(sorted(KNOWN))}"
+            )
         if any(h in key for h in SECRET_HINTS):
             raise ValueError(
                 f"{path}: {key} looks like a secret; keep it in your keychain or sign-in, "
@@ -86,19 +91,40 @@ def load(path: Path) -> dict:
     }
 
 
+REASONS = {
+    "ONEXOPS_SCOPE": "who the settings are for: org, team, local or personal",
+    "ONEXOPS_DIR": "this tenant's folder",
+    "ONEXOPS_OUT": "where the files for IT are written",
+    "ONEXOPS_CONNECTORS": "the connectors this tenant uses",
+    "AWS_CONFIG_FILE": "this tenant's own AWS config file",
+    "AWS_BILLING_PROFILE": "read-only AWS sign-in for cost and savings questions",
+    "AWS_OPERATIONS_PROFILE": "read-only AWS sign-in for audit, monitoring and security review",
+    "AWS_REGION": "where this tenant's workloads run",
+    "AZURE_CONFIG_DIR": "this tenant's Reader identity folder",
+    "AZURE_TENANT_ID": "the Azure tenant of the Reader identity",
+    "AZURE_SUBSCRIPTION_ID": "the Azure subscription to read",
+}
+
+
+def _line(key: str, value: str) -> str:
+    reason = REASONS.get(key)
+    return f"{key}={value}" + (f"  # {reason}" if reason else "")
+
+
 def dump(config: dict) -> str:
     """The .env.1xops text for a config made by `1xops setup`."""
     lines = [
         "# 1xops: non-secret values only. Secrets stay in AWS SSO, az login or the Atlassian sign-in.",
-        f"ONEXOPS_SCOPE={config['scope']}",
+        _line("ONEXOPS_SCOPE", config["scope"]),
     ]
     if config.get("dir"):
-        lines.append(f"ONEXOPS_DIR={config['dir']}")
+        lines.append(_line("ONEXOPS_DIR", config["dir"]))
     if config.get("out"):
-        lines.append(f"ONEXOPS_OUT={config['out']}")
-    lines.append(f"ONEXOPS_CONNECTORS={','.join(config.get('connectors', {}))}")
+        lines.append(_line("ONEXOPS_OUT", config["out"]))
+    lines.append(_line("ONEXOPS_CONNECTORS", ",".join(config.get("connectors", {}))))
+    lines += [_line(k, v) for k, v in config.get("extra", {}).items()]
     seen: dict[str, str] = {}
     for values in config.get("connectors", {}).values():
         seen.update(values)
-    lines += [f"{k}={v}" for k, v in seen.items()]
+    lines += [_line(k, v) for k, v in seen.items()]
     return "\n".join(lines) + "\n"

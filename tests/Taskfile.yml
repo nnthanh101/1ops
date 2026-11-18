@@ -15,7 +15,10 @@ vars:
 
 tasks:
   gate:
-    desc: 'Local first: lint, tests, act, image, UX proof - what CI and a customer will see (stops at the first failure)'
+    desc: '🚦 Local first: lint, tests, CI workflow, image, UX proof; stops at the first failure'
+    summary: |
+      Business value: what CI and a customer will see, proven on this machine before anyone else sees it.
+      Scenario: run it before saying "done" and before every commit. `task release` runs it before anything is pushed.
     dir: '{{.ROOT_DIR}}'
     cmds:
       - task: lint
@@ -27,26 +30,35 @@ tasks:
       - echo "gate - all passed. Look at tmp/ux/*.svg before calling it done."
 
   lint:
-    desc: 'ruff check + ruff format --check on src and tests, exactly as CI'
+    desc: '🧹 Style and format checks, exactly as CI runs them'
+    summary: |
+      Business value: no red build for a formatting rule.
+      Scenario: CI once failed on the format check because the quick tests never ran it.
     dir: '{{.ROOT_DIR}}/packages/python'
     cmds:
       - uv run -q --group dev ruff check src tests
       - uv run -q --group dev ruff format --check src tests
 
   image:
-    desc: 'Build the container image and run it, as CI (act cannot)'
+    desc: '🐳 Build the container image and run it, as CI does'
+    summary: |
+      Business value: the container customers pull starts and reports the right version.
+      Scenario: a first Dockerfile written from scratch was 386 MB, unpinned and unlocked; this build is measured every time.
     dir: '{{.ROOT_DIR}}'
     cmds:
-      - docker build -q -t 1xops:gate-{{.TAG}} packages/python >/dev/null
+      - docker build -q --build-context repo=. -t 1xops:gate-{{.TAG}} packages/python >/dev/null
       - test "$(docker run --rm 1xops:gate-{{.TAG}} --version)" = "1xops $(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)"
 
   ux:
-    desc: 'UX proof: every 1xops command in a real terminal, checked, with screenshots (tmp/ux)'
+    desc: '🖥️  UX proof: every command in a real terminal, checked, with screenshots (tmp/ux)'
+    summary: |
+      Business value: what a person sees is verified, not only what the tests assert.
+      Scenario: version 0.2.4 shipped a misaligned table while all 50 tests passed. Look at every tmp/ux/*.svg after a run.
     dir: '{{.ROOT_DIR}}'
     cmds:
       - rm -rf tmp/ux && mkdir -p tmp/ux/pkg
       - uv build -q --project packages/python --out-dir tmp/ux/pkg
-      - cd packages/npm && npm pack --silent --pack-destination ../../tmp/ux/pkg >/dev/null && rm -rf profiles
+      - cd packages/npm && npm pack --silent --pack-destination ../../tmp/ux/pkg >/dev/null && rm -rf profiles LICENSE NOTICE
       - |
         docker build -q -t 1xops-ux:py-{{.TAG}} -f - tmp/ux/pkg >/dev/null <<'EOF'
         FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
@@ -66,3 +78,23 @@ tasks:
         WORKDIR /work
         EOF
       - UX_TAG={{.TAG}} uv run -q --project packages/python python scripts/ux_proof.py tmp/ux
+
+  test:
+    desc: '🧪 Quick tests: Python, Node.js, and that both print the same bytes'
+    summary: |
+      Business value: the two tools never disagree, so a customer gets the same result from either install.
+      Scenario: a fix in one tool passes its own tests but changes what the other prints; this catches it.
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - uv run --project packages/python --group dev pytest -q packages/python/tests
+      - npm test --prefix packages/npm --silent
+      # Python and Node.js print the same bytes, on this machine's real tools (a check that printed nothing fails)
+      - mkdir -p tmp && uv run -q --project packages/python 1xops doctor >tmp/doctor-py.txt 2>&1; echo "exit $?" >>tmp/doctor-py.txt; node packages/npm/bin/1xops.mjs doctor >tmp/doctor-js.txt 2>&1; echo "exit $?" >>tmp/doctor-js.txt; test "$(wc -l <tmp/doctor-py.txt)" -gt 2 && cmp tmp/doctor-py.txt tmp/doctor-js.txt
+
+  ci:
+    desc: '🔁 The full check, as it runs on GitHub'
+    summary: |
+      Business value: a red CI run is reproduced on this machine before a fix is pushed.
+      Scenario: CI fails on a pull request; run this to see the same failure locally.
+    dir: '{{.ROOT_DIR}}'
+    cmds: [act pull_request -W .github/workflows/release.yml --rm]

@@ -1,6 +1,6 @@
 {
   "name": "1xops",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "1xops by OceanSoft.io: cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced, read-only by default, nothing changed without a yes.",
   "author": {
     "name": "Nhat-Thanh Nguyen",

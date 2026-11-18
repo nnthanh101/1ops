@@ -21,7 +21,10 @@ ARG UV_VERSION
 RUN apk add --no-cache python-3.14 "uv~${UV_VERSION}" && \
     uv --version | grep -q "^uv ${UV_VERSION}[ +]"
 WORKDIR /src
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md hatch_build.py ./
+# The one LICENSE and NOTICE at the repository root (build with --build-context repo=.)
+COPY --from=repo LICENSE NOTICE ./
+COPY --from=repo templates/settings ./templates/settings
 COPY src ./src
 ENV UV_PROJECT_ENVIRONMENT=/opt/1xops UV_PYTHON=/usr/bin/python3.14 UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1
 RUN uv sync --locked --no-dev --no-editable && /opt/1xops/bin/1xops --version

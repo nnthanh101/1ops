@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+from datetime import date
 from pathlib import Path
 
 from rich.console import Console
@@ -55,12 +56,31 @@ def detect() -> dict[str, str | list[str]]:
     return found
 
 
+def aws_config_file() -> Path:
+    """The AWS config file the CLI reads: AWS_CONFIG_FILE, else ~/.aws/config."""
+    return Path(os.environ.get("AWS_CONFIG_FILE") or Path.home() / ".aws" / "config")
+
+
+def azure_subscriptions() -> list[tuple[str, str, str]]:
+    """(name, subscription id, tenant id) of the subscriptions the read-only identity in AZURE_CONFIG_DIR can see.
+    Read from its local sign-in, no cloud call. Without AZURE_CONFIG_DIR nothing is read: the default login is never used."""
+    if not os.environ.get("AZURE_CONFIG_DIR"):
+        return []
+    raw = _out(
+        ["az", "account", "list", "--query", "[].{n:name,s:id,t:tenantId}", "--output", "json"]
+    )
+    try:
+        return [(a["n"], a["s"], a["t"]) for a in json.loads(raw)]
+    except (ValueError, KeyError, TypeError):
+        return []
+
+
 def read_only_profiles() -> list[tuple[str, str, str]]:
     """(name, masked account, role) of AWS profiles whose configured role cannot change things.
     Read from the local AWS config only: no cloud call. Unknown and can-change profiles are left out."""
     from one_xops import cli  # imported here: cli imports this module
 
-    cfg = Path(os.environ.get("AWS_CONFIG_FILE") or Path.home() / ".aws" / "config")
+    cfg = aws_config_file()
     if not cfg.is_file():
         return []
     found: list[tuple[str, str, str]] = []
@@ -118,13 +138,19 @@ def ask_profile(var: str) -> str:
     options = read_only_profiles()
     if not options:
         if "none" not in _shown:
-            console.print("  No read-only AWS profile in ~/.aws/config yet.", highlight=False)
+            console.print(
+                f"  No read-only AWS profile in {aws_config_file()} yet.", highlight=False
+            )
             console.print(
                 "  Create one with: aws configure sso (a role such as ReadOnlyAccess).",
                 highlight=False,
             )
             console.print(
-                "  Until then /1xops:check shows this connector as missing.", highlight=False
+                "  Profiles in another file? Run: AWS_CONFIG_FILE=<file> 1xops setup",
+                highlight=False,
+            )
+            console.print(
+                "  Until then 1xops doctor shows this connector as missing.", highlight=False
             )
             _shown.add("none")
         return ""
@@ -162,11 +188,203 @@ def ask_profile(var: str) -> str:
             )
 
 
+_picked: dict[
+    str, str
+] = {}  # the tenant of the picked Azure subscription, so it is not asked again
+DEFAULTS = {"AWS_REGION": "ap-southeast-2"}  # Sydney; a region is not a secret
+
+
+def ask_subscription(found: dict) -> str:
+    """Pick an Azure subscription of the Reader identity by number or part of a name; its tenant fills in by itself."""
+    rows = azure_subscriptions()
+    if not rows:
+        if "azure-none" not in _shown:
+            console.print(
+                "  No Azure Reader sign-in found. Use a Reader identity in its own folder, never your own login:",
+                highlight=False,
+            )
+            console.print(
+                "    AZURE_CONFIG_DIR=~/.azure-reader az login   then run setup again. Or type the ID now.",
+                highlight=False,
+            )
+            _shown.add("azure-none")
+        default = os.environ.get("AZURE_SUBSCRIPTION_ID") or found.get("AZURE_SUBSCRIPTION_ID")
+        return Prompt.ask(
+            "  AZURE_SUBSCRIPTION_ID (blank to skip)",
+            default=default or "",
+            show_default=bool(default),
+        )
+    table = Table(
+        title=f"Azure subscriptions of the Reader identity ({len(rows)})", title_style="bold"
+    )
+    for col in ("#", "name", "subscription", "tenant"):
+        table.add_column(col, justify="right" if col == "#" else "left")
+    for n, (name, sub, tenant) in enumerate(rows, 1):
+        table.add_row(str(n), name, f"****{sub[-4:]}", f"****{tenant[-4:]}")
+    console.print(table)
+    current = os.environ.get("AZURE_SUBSCRIPTION_ID") or found.get("AZURE_SUBSCRIPTION_ID", "")
+    default = next((str(n) for n, r in enumerate(rows, 1) if r[1] == current), "")
+    hint = f"Enter keeps {default}, - skips" if default else "Enter skips"
+    while True:
+        pick = Prompt.ask(
+            f"  AZURE_SUBSCRIPTION_ID: number or part of a name ({hint})",
+            default=default,
+            show_default=False,
+        ).strip()
+        if not pick or pick == "-":
+            return ""
+        chosen = rows[int(pick) - 1] if pick.isdigit() and 1 <= int(pick) <= len(rows) else None
+        if chosen is None and not pick.isdigit():
+            hits = [r for r in rows if pick.lower() in r[0].lower()]
+            chosen = hits[0] if len(hits) == 1 else None
+        if chosen:
+            _picked["AZURE_TENANT_ID"] = chosen[2]
+            return chosen[1]
+        console.print(
+            f"  No single subscription matches '{pick}': pick 1 to {len(rows)}.", highlight=False
+        )
+
+
 def ask_value(var: str, found: dict) -> str:
     if var.endswith("_PROFILE"):
         return ask_profile(var)
-    default = os.environ.get(var) or found.get(var)
-    return Prompt.ask(f"  {var} (blank to skip)", default=default or "", show_default=bool(default))
+    if var == "AZURE_SUBSCRIPTION_ID":
+        return ask_subscription(found)
+    if var == "AZURE_TENANT_ID" and var in _picked:
+        console.print("  AZURE_TENANT_ID: taken from the subscription.", highlight=False)
+        return _picked[var]
+    default = os.environ.get(var) or found.get(var) or DEFAULTS.get(var)
+    label = f"  {var}" if default else f"  {var} (blank to skip)"
+    return Prompt.ask(label, default=default or "", show_default=bool(default))
+
+
+def _verify(label: str, check, login: list[str]) -> None:
+    """Show whether a connector is ready; when it is signed out, offer the provider's own sign-in and check again."""
+    from one_xops import cli
+
+    def show(row: tuple[str, str, str]) -> None:
+        console.print(
+            f"  {'✓' if row[1] == 'ready' else '✗'} {label}: {cli.scrub(row[2])}",
+            markup=False,
+            highlight=False,
+        )
+
+    row = check()
+    show(row)
+    if (
+        row[1] == "signed out"
+        and shutil.which(login[0])
+        and Confirm.ask(f"  Sign in now? ({' '.join(login)}; opens your browser)", default=True)
+    ):
+        subprocess.run(login, check=False)
+        show(check())
+
+
+def connect(connectors: dict[str, dict[str, str]]) -> None:
+    """Sign in with each provider's own command, then check that access is read-only."""
+    from one_xops import cli
+
+    console.print("\nConnect: sign in, then check that access is read-only.", markup=False)
+    for name, values in connectors.items():
+        if name == "aws":
+            for var in ("AWS_BILLING_PROFILE", "AWS_OPERATIONS_PROFILE"):
+                profile = values.get(var)
+                if profile:
+                    _verify(
+                        f"aws {var}",
+                        lambda var=var, profile=profile: cli._aws_connector(var, {var: profile}),
+                        ["aws", "sso", "login", "--profile", profile],
+                    )
+        elif name == "azure":
+            if not os.environ.get("AZURE_CONFIG_DIR"):
+                console.print(
+                    "  azure: use a Reader identity in its own folder (AZURE_CONFIG_DIR), then run setup again.",
+                    markup=False,
+                )
+            else:
+                _verify(
+                    "azure", lambda values=values: cli._azure_connector(values), ["az", "login"]
+                )
+        elif name == "itsm":
+            console.print(
+                "  itsm: sign in inside the assistant: start it in this folder, run /mcp and choose atlassian.",
+                markup=False,
+            )
+            if shutil.which("claude") and Confirm.ask(
+                "  Start the assistant here now to sign in? (claude)", default=False
+            ):
+                subprocess.run(["claude"], check=False)
+    _verify(
+        "github",
+        cli._github_connector,
+        ["gh", "auth", "login", "--web", "--hostname", "github.com"],
+    )
+
+
+def _slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:63]
+    return slug if re.fullmatch(r"[a-z][a-z0-9-]{1,62}", slug) else f"tenant-{slug}"[:63]
+
+
+def tenant_note(name: str, connectors: list[str]) -> str:
+    """The starter note of a tenant's docs folder: front matter that follows the wiki's contract, so the folder can
+    be opened in Obsidian and rendered by Docusaurus as it is."""
+    return (
+        f"---\nid: {_slug(name)}\ntitle: {name}\ntype: entity\nstatus: emerging\n"
+        f"last_updated: {date.today().isoformat()}\nsources: []\ntags: [tenant]\n---\n\n# {name}\n\n"
+        "What this tenant runs, who owns it, and where its runbooks are.\n\n"
+        "- Owner: (add a name or team)\n"
+        f"- Connectors: {', '.join(connectors) or '(none yet)'}\n"
+        "- Runbooks go in `runbooks/` (type: runbook), postmortems in `reviews/` (type: review), "
+        "services and systems in `entities/` (type: entity), decisions in `decisions/` (type: decision).\n\n"
+        "Notes may name things: profiles, accounts masked as ****1234. They never hold keys, tokens or passwords.\n"
+    )
+
+
+def _home(p: str) -> str:
+    """A path with the home folder written as ~, so the file works on another machine."""
+    home = str(Path.home())
+    return "~" + p[len(home) :] if p.startswith(home + os.sep) else p
+
+
+def tenant_aws_files() -> list[tuple[str, Path]]:
+    """(tenant, config file) for ~/.aws/tenants/<tenant>/config: one AWS config file per tenant."""
+    root = Path.home() / ".aws" / "tenants"
+    return sorted((p.parent.name, p) for p in root.glob("*/config") if p.is_file())
+
+
+def pick_aws_config() -> dict[str, str]:
+    """This tenant's own AWS config file, recorded in .env.1xops so no shell setting is needed."""
+    if os.environ.get("AWS_CONFIG_FILE"):
+        return {"AWS_CONFIG_FILE": _home(os.environ["AWS_CONFIG_FILE"])}
+    options = tenant_aws_files()
+    if not options:
+        return {}
+    table = Table(title=f"AWS config files, one per tenant ({len(options)})", title_style="bold")
+    for col in ("#", "tenant", "file"):
+        table.add_column(col, justify="right" if col == "#" else "left")
+    for n, (name, file) in enumerate(options, 1):
+        table.add_row(str(n), name, _home(str(file)))
+    console.print(table)
+    while True:
+        pick = Prompt.ask(
+            "  AWS_CONFIG_FILE: number or part of a tenant name (Enter skips)",
+            default="",
+            show_default=False,
+        ).strip()
+        if not pick or pick == "-":
+            return {}
+        hits = (
+            [options[int(pick) - 1]]
+            if pick.isdigit() and 1 <= int(pick) <= len(options)
+            else [o for o in options if not pick.isdigit() and pick.lower() in o[0].lower()]
+        )
+        if len(hits) == 1:
+            os.environ["AWS_CONFIG_FILE"] = str(hits[0][1])
+            return {"AWS_CONFIG_FILE": _home(str(hits[0][1]))}
+        console.print(
+            f"  No single tenant matches '{pick}': pick 1 to {len(options)}.", highlight=False
+        )
 
 
 def run(args: argparse.Namespace) -> int:
@@ -174,6 +392,7 @@ def run(args: argparse.Namespace) -> int:
 
     path = Path(args.file)
     _shown.clear()
+    _picked.clear()
     console.print("[bold]1xops setup[/] — non-secret values only; secrets stay in your sign-in.\n")
     scopes = Table(title="Who the settings are for", title_style="bold")
     scopes.add_column("scope")
@@ -184,7 +403,14 @@ def run(args: argparse.Namespace) -> int:
     scope = Prompt.ask("Scope", choices=list(s.SCOPES), default="team")
     config: dict = {"scope": scope}
     if scope in ("team", "local"):
-        config["dir"] = Prompt.ask("Project or tenant folder", default=".")
+        folder = Prompt.ask(
+            f"Tenant folder (Enter = this folder: {Path.cwd()})", default=".", show_default=False
+        )
+        if args.file == cf.DEFAULT_FILE:  # the tenant's settings file lives in the tenant's folder
+            path = Path(folder) / cf.DEFAULT_FILE
+            config["dir"] = "."
+        else:
+            config["dir"] = folder
     if scope == "org":
         config["out"] = Prompt.ask("Folder to write the managed files to", default=".")
 
@@ -194,6 +420,12 @@ def run(args: argparse.Namespace) -> int:
         profile = s.load_profile(name)
         if not Confirm.ask(f"Add {name}: {profile.get('description', '')}?", default=False):
             continue
+        if name == "aws":
+            config.setdefault("extra", {}).update(pick_aws_config())
+        if name == "azure" and os.environ.get("AZURE_CONFIG_DIR"):
+            config.setdefault("extra", {})["AZURE_CONFIG_DIR"] = _home(
+                os.environ["AZURE_CONFIG_DIR"]
+            )
         values = {v: ask_value(v, found) for v in cf.variables(profile)}
         connectors[name] = {k: v for k, v in values.items() if v}
     own = Prompt.ask("Your own profile .json file (blank to skip)", default="", show_default=False)
@@ -211,13 +443,32 @@ def run(args: argparse.Namespace) -> int:
         return 1
     s.write(path, text)
     cf.load(path)  # same checks as `1xops config --file`
+    if scope in ("team", "local"):
+        note = path.parent / "docs" / "tenant.md"
+        if not note.exists():
+            s.write(note, tenant_note(path.parent.resolve().name, list(connectors)))
+            console.print(
+                f"Wrote {note}: this tenant's notes. Open the docs folder in Obsidian.",
+                markup=False,
+                highlight=False,
+            )
 
     console.print("\nChanges this would make:")
     if cli.main(["config", "--file", str(path), "--preview", "summary"]) != 0:
         return 2
     if Confirm.ask("Show every line first?", default=False):
         cli.main(["config", "--file", str(path), "--preview", "full"])
+    code = 0
     if Confirm.ask("Apply them now?", default=False):
-        return cli.main(["config", "--file", str(path), "--yes"])
-    console.print(f"Apply later with: 1xops config --file {path} --yes")
-    return 0
+        code = cli.main(["config", "--file", str(path), "--yes"])
+    else:
+        console.print(f"Apply later with: 1xops config --file {path} --yes")
+    if (
+        code == 0
+        and connectors
+        and Confirm.ask(
+            "Connect and verify now? (signs in with each provider's own command)", default=True
+        )
+    ):
+        connect(connectors)
+    return code

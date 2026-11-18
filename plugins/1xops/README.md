@@ -20,12 +20,34 @@ One namespace for free and enterprise: every command and skill is `/1xops:<name>
 | Command | What it does | Edition |
 |---|---|---|
 | `/1xops:check` | Each connector as ready, signed out or missing, with the exact fix; runs `1xops doctor` | Free (this repository) |
+| `/1xops:tenant-setup` (skill) | Create, list, show or switch the active tenant; one non-secret settings file per tenant | Free |
+| `/1xops:change-request` (skill) | A change request with impact, risk and rollback for your change board, from a description or `terraform show -json`; filed only after a yes | Free |
+| `/1xops:vendor-review` (skill) | Total cost, risk and contract status of a vendor, with one recommendation; every figure sourced | Free |
+| `/1xops:process-doc` (skill) | A process document (SOP, workflow, RACI) saved to your knowledge base after a yes | Free |
+| `/1xops:capacity-plan` (skill) | Load, growth, headroom and when a limit is reached, from real utilisation | Free |
+| `/1xops:compliance-tracking` (skill) | Controls and evidence: status, gaps, owners and due dates | Free |
 | `/1xops:cost-check` | Top AWS and Azure savings, each with \$/month and its source | Enterprise |
-| `/1xops:change-request` | A change request ready for your change board, from `terraform show -json` | Enterprise |
 | `/1xops:ai-spend` | AI spend by team, vendor, and seat vs API | Enterprise |
 | `/1xops:runbook` | A runbook with a person's yes at each step, and evidence | Enterprise |
 | `/1xops:status` | The weekly status, from a live project board | Enterprise |
 | `/1xops:read-only-cloud` (skill) | Keeps AWS and Azure work read-only: checks access first, proposes any change | Enterprise |
+
+### Tenants
+
+The skills work per tenant: a company, a team or a customer you operate for. Each tenant is one file of non-secret settings, `tenants/<name>/tenant.env` (names, approvers, where documents and changes go, which clouds). The active tenant is the one name in `tenants/.active`. `/1xops:tenant-setup new <name>` asks for each value; nothing secret is stored, and sign-ins stay with each connector.
+
+### Session start
+
+When a session opens in a tenant folder (one with a `.env.1xops`), 1xops names each connector that is not ready, with its fix, before the first prompt. When everything is ready it prints nothing, and it never holds the session up: the check stops after 4 seconds and says so in one line. Removing the plugin removes the check.
+
+It looks at the tenant's connectors in `.env.1xops`, the servers of this plugin and of the `operations` plugin it depends on. It reads no token. Two optional keys in `.env.1xops`:
+
+| Key | What it does |
+|---|---|
+| `AWS_BILLING_ACCOUNT`, `AWS_OPERATIONS_ACCOUNT` | The account the profile must sign in to; a different one is named as the wrong account, masked as `****1234` |
+| `ONEXOPS_IGNORE` | Connector names to leave out, comma separated, for example `gmail,google calendar` |
+
+`1xops doctor` lists every connector for the tenant; `1xops doctor --brief` shows what the session start shows.
 
 ### Naming convention
 
