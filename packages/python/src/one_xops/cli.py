@@ -198,6 +198,9 @@ def check_edition() -> tuple[str, bool, bool, str]:
     return ("edition", False, False, "plugin not installed: 1xops install --yes")
 
 
+READER_HINT = "use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login"
+
+
 def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
     """Read-only sign-in checks. Account IDs are masked, never printed in full."""
     rows = []
@@ -224,14 +227,17 @@ def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
             rows.append(("aws access", False, access == "read", ACCESS[access]))
         else:
             rows.append(("aws sign-in", False, False, "not signed in (aws sso login)"))
-    if shutil.which("az"):
+    if shutil.which("az") and not os.environ.get("AZURE_CONFIG_DIR"):
+        # the default login is never read: it is a person's own, and it may change things
+        rows.append(("azure sign-in", False, False, f"not checked: {READER_HINT}"))
+    elif shutil.which("az"):
         code, _ = _run(["az", "account", "show", "--output", "none"])
         rows.append(
             (
                 "azure sign-in",
                 False,
                 code == 0,
-                "signed in" if code == 0 else "not signed in (az login)",
+                "Reader folder signed in" if code == 0 else f"not signed in: {READER_HINT}",
             )
         )
     if shutil.which("gh"):
@@ -441,7 +447,10 @@ def _github_connector() -> tuple[str, str, str]:
     user = re.search(r"account (\S+)", out)
     who = f"signed in as {user.group(1)}" if user else "signed in"
     scopes = re.search(r"Token scopes:\s*(.+)", out)
-    if not scopes:
+    if not scopes or scopes.group(1).strip().strip("'") in (
+        "",
+        "none",
+    ):  # fine-grained: no scopes to read
         return (
             "github",
             "check",
@@ -725,6 +734,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     with console.status("Checking tools, sign-ins and connectors (read-only)…"):
         rows = check_tools() + [check_edition()] + check_sign_in(args.aws_profile)
         connectors = connector_rows(args.file, [])
+    rows = [r for r in rows if r[0] not in covered_sign_ins(connectors, args.aws_profile)]
     shown = [
         (
             name,
@@ -755,6 +765,20 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         console.print(Text(f"Required: {', '.join(failed)}", style="red"), soft_wrap=True)
         return 1
     return 0
+
+
+def covered_sign_ins(connectors: list, aws_profile: str | None = None) -> set[str]:
+    """Sign-in rows to leave out: a connector of this folder already checks that provider with the folder's own
+    profile or identity, and the shell's default sign-in would contradict it."""
+    names = [c[0].split(" (")[0] for c in connectors]
+    covered = set()
+    if not aws_profile and any(n.startswith("aws ") for n in names):
+        covered |= {"aws sign-in", "aws access"}
+    if "azure" in names:
+        covered.add("azure sign-in")
+    if "github" in names:
+        covered.add("github sign-in")
+    return covered
 
 
 def next_steps(shown: list[tuple[str, str, str, str]]) -> list[Text]:

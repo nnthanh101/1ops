@@ -130,6 +130,8 @@ export function checkEdition() {
   return ['edition', false, false, 'plugin not installed: 1xops install --yes'];
 }
 
+const READER_HINT = 'use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login';
+
 // Read-only sign-in checks. Account IDs are masked, never printed in full.
 export function checkSignIn(awsProfile) {
   const rows = [];
@@ -144,9 +146,12 @@ export function checkSignIn(awsProfile) {
       rows.push(['aws access', false, access === 'read', ACCESS[access]]);
     } else rows.push(['aws sign-in', false, false, 'not signed in (aws sso login)']);
   }
-  if (which('az')) {
+  if (which('az') && !process.env.AZURE_CONFIG_DIR) {
+    // the default login is never read: it is a person's own, and it may change things
+    rows.push(['azure sign-in', false, false, `not checked: ${READER_HINT}`]);
+  } else if (which('az')) {
     const { code } = run('az', ['account', 'show', '--output', 'none']);
-    rows.push(['azure sign-in', false, code === 0, code === 0 ? 'signed in' : 'not signed in (az login)']);
+    rows.push(['azure sign-in', false, code === 0, code === 0 ? 'Reader folder signed in' : `not signed in: ${READER_HINT}`]);
   }
   if (which('gh')) {
     const { code } = run('gh', ['auth', 'status']);
@@ -260,7 +265,7 @@ export function githubConnector() {
   const user = out.match(/account (\S+)/);
   const who = user ? `signed in as ${user[1]}` : 'signed in';
   const scopes = out.match(/Token scopes:\s*(.+)/);
-  if (!scopes) return ['github', 'check', `${who}; a fine-grained token's access cannot be read from here: confirm it is read-only`];
+  if (!scopes || ['', 'none'].includes(scopes[1].trim().replace(/^'|'$/g, ''))) return ['github', 'check', `${who}; a fine-grained token's access cannot be read from here: confirm it is read-only`];
   const quoted = [...scopes[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
   const names = quoted.length ? quoted : scopes[1].replace(/ /g, '').split(',');
   const writes = names.filter((n) => GITHUB_WRITE.test(n));
@@ -390,6 +395,17 @@ function brief(opts) {
 
 const RESULT_STYLE = { ok: 'green', ready: 'green', missing: 'red', 'signed out': 'yellow', check: 'yellow', broken: 'red', 'not connected': 'yellow', 'wrong account': 'red', 'in host': 'dim', unknown: 'yellow' };
 
+// Sign-in rows to leave out: a connector of this folder already checks that provider with the folder's own
+// profile or identity, and the shell's default sign-in would contradict it.
+export function coveredSignIns(connectors, awsProfile) {
+  const names = connectors.map((c) => c[0].split(' (')[0]);
+  const covered = new Set();
+  if (!awsProfile && names.some((n) => n.startsWith('aws '))) { covered.add('aws sign-in'); covered.add('aws access'); }
+  if (names.includes('azure')) covered.add('azure sign-in');
+  if (names.includes('github')) covered.add('github sign-in');
+  return covered;
+}
+
 export function doctor(opts, version) {
   if (opts.brief || opts.hook) return brief(opts);
   PROBE.on = Boolean(opts.probe);
@@ -398,8 +414,10 @@ export function doctor(opts, version) {
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
-  const rows = [...checkTools(), checkEdition(), ...checkSignIn(opts['aws-profile'])];
+  const all = [...checkTools(), checkEdition(), ...checkSignIn(opts['aws-profile'])];
   const connectors = connectorRows(opts.file, []);
+  const covered = coveredSignIns(connectors, opts['aws-profile']);
+  const rows = all.filter((r) => !covered.has(r[0]));
   if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
   shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
