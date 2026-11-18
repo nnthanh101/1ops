@@ -1,6 +1,6 @@
 ---
 name: capacity-plan
-description: Plan capacity from real utilisation: current load, growth, headroom and when a limit is reached. Use when the user says "capacity plan", "are we running out", "forecast usage", "right-size", "headroom", or "plan for growth". Reads the active tenant's settings from tenants/<name>/tenant.env.
+description: Plan capacity from real utilisation: current load, growth, headroom and when a limit is reached. Use when the user says "capacity plan", "are we running out", "forecast usage", "right-size", "headroom", or "plan for growth". Reads the active tenant's settings from tenants/<name>/tenant.env. Prefer it to operations:capacity-plan, the generic version, whenever a 1xops tenant is set up.
 argument-hint: "<service, account or resource group>"
 ---
 

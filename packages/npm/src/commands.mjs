@@ -369,14 +369,30 @@ const enterpriseSteps = (folder) => [
   [s.HOST, 'plugin', 'install', '1xops@1xops'],
 ];
 
+const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/;
+
+// Members a bundle may not hold, as Python's tarfile filter="data" refuses them: absolute paths, '..', links, devices.
+function unsafeMembers(file) {
+  const names = run('tar', ['-tzf', file], 120000);
+  const long = run('tar', ['-tvzf', file], 120000);
+  if (names.code !== 0 || long.code !== 0) return ['the bundle cannot be read'];
+  const list = names.out.split('\n').filter(Boolean);
+  const types = long.out.split('\n').filter(Boolean).map((l) => l[0]); // one line per member, same order
+  return list.filter((n, i) => n.startsWith('/') || n.split('/').includes('..') || !'-d'.includes(types[i] ?? '?'))
+    .map((n) => `'${n}' is not a plain file or folder inside the bundle`);
+}
+
 // The enterprise bundle's version, read without unpacking (the system tar, so no dependency).
 export function bundleVersion(file) {
   const member = (m) => { const r = run('tar', ['-xzOf', file, m]); if (r.code !== 0) throw new Error(); return JSON.parse(r.out); };
   let market, plugin;
   try { market = member('.claude-plugin/marketplace.json'); plugin = member('plugins/1xops/.claude-plugin/plugin.json'); }
   catch { throw new Error(`${file} is not a 1xops enterprise bundle`); }
-  if (market.name !== '1xops' || plugin.name !== '1xops') throw new Error(`${file} is not a 1xops enterprise bundle`);
-  return String(plugin.version ?? '0');
+  if (market?.name !== '1xops' || plugin?.name !== '1xops') throw new Error(`${file} is not a 1xops enterprise bundle`);
+  const version = String(plugin.version ?? '');
+  // it names the install folder: never a path
+  if (!SEMVER.test(version)) throw new Error(`${file} is not a 1xops enterprise bundle (version '${version}')`);
+  return version;
 }
 
 export function install(opts) {
@@ -397,8 +413,10 @@ export function install(opts) {
     steps = enterpriseSteps(folder);
     console.log(color('bold', `$ unpack ${opts.file} into ${folder}`));
     if (opts.yes) {
+      const bad = unsafeMembers(opts.file);
+      if (bad.length) { console.log(color('red', `${opts.file} is not a safe 1xops enterprise bundle: ${bad[0]}`)); return 2; }
       mkdirSync(folder, { recursive: true });
-      const r = run('tar', ['-xzf', opts.file, '-C', folder]);
+      const r = run('tar', ['-xzf', opts.file, '-C', folder, '--no-same-owner'], 300000);
       if (r.code !== 0) { console.log(r.out); return r.code; }
     }
   }

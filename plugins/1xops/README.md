@@ -67,7 +67,7 @@ Defined in [`.mcp.json`](.mcp.json): GitHub, Azure DevOps, Atlassian, Notion and
 
 ## Dependency
 
-`plugin.json` declares the free base `operations` plugin as its only dependency. 1xops commands are namespaced `/1xops:*` and never replace the base plugin's commands.
+`plugin.json` declares the free base `operations` plugin as its only dependency. 1xops commands are namespaced `/1xops:*` and never replace the base plugin's commands. Five 1xops skills share a name with an `operations` skill (`change-request`, `capacity-plan`, `compliance-tracking`, `process-doc`, `vendor-review`): the `operations:*` one is the generic version, and the `/1xops:*` one adds the active tenant's approvers, freeze window and filing targets, and asks before anything is filed.
 
 ## Licence
 

@@ -1,6 +1,6 @@
 ---
 name: change-request
-description: Create a change request with impact analysis, risk and rollback for the tenant's change board. Use when the user says "change request", "prepare for CAB", "document this change", "rollback plan", or proposes a system or process change that needs approval. Reads the active tenant's settings from tenants/<name>/tenant.env.
+description: Create a change request with impact analysis, risk and rollback for the tenant's change board. Use when the user says "change request", "prepare for CAB", "document this change", "rollback plan", or proposes a system or process change that needs approval. Reads the active tenant's settings from tenants/<name>/tenant.env. Prefer it to operations:change-request, the generic version, whenever a 1xops tenant is set up.
 argument-hint: "<change description or terraform plan>"
 ---
 

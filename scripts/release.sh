@@ -18,6 +18,9 @@ last=$(printf '%s\n%s\n' "$pub" "${tag:-0.0.0}" | sort -V | tail -1)
 # capability), major (a breaking change to commands, files or settings).
 V=${VERSION:-$(echo "$last" | awk -F. -v b="${BUMP:-patch}" '{ if (b=="major") print $1+1".0.0"; else if (b=="minor") print $1"."$2+1".0"; else print $1"."$2"."$3+1 }')}
 STORY=${STORY:-}
+[[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "release: VERSION must be x.y.z, not '$V'"; exit 1; }
+[ "$V" != "$pub" ] && [ "$(printf '%s\n%s\n' "$pub" "$V" | sort -V | tail -1)" = "$V" ] \
+  || { echo "release: v$V is not newer than the published v$pub"; exit 1; }
 [ "$(git branch --show-current)" = develop ] || { echo "release: run it on develop"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "release: commit or stash your changes first"; exit 1; }
 [ "$(git rev-parse origin/develop)" = "$(git rev-parse HEAD)" ] || { echo "release: this clone is not at origin/develop; pull or push first"; exit 1; }
@@ -43,10 +46,15 @@ fi
 pr=$(gh pr list -R $R --base main --head develop --state open --json number --jq '.[0].number // empty')
 [ -n "$pr" ] || pr=$(gh pr create -R $R --base main --head develop --title "release: v$V" --body "Release v$V" | grep -oE '[0-9]+$')
 echo "release: pull request #$pr; waiting for its checks"
+for _ in $(seq 30); do # a new commit's checks take a moment to register; --watch fails while there are none
+  [ "$(gh pr view "$pr" -R $R --json statusCheckRollup --jq '.statusCheckRollup | length')" -gt 0 ] && break
+  sleep 2
+done
 gh pr checks "$pr" -R $R --watch --fail-fast
 gh pr merge "$pr" -R $R --merge
 git fetch -q origin
-git tag "v$V" origin/main
+# A rerun after a later step failed keeps the tag it already made on main.
+git rev-parse -q --verify "refs/tags/v$V" >/dev/null || git tag "v$V" origin/main
 git push -q origin "v$V"
 
 run=""
@@ -61,11 +69,13 @@ gh run watch "$run" -R $R --exit-status >/dev/null || { echo "release: the Relea
 
 # The registries need a moment to serve a new version everywhere. Prove only once the files a customer's install
 # fetches answer: PyPI's simple index (what uv and pip read) and the npm tarball. Their JSON APIs answer first (up to 5 min).
+served=""
 for _ in $(seq 30); do
   curl -sf -H 'Accept: application/vnd.pypi.simple.v1+json' https://pypi.org/simple/1xops/ | grep -q "\"$V\"" \
-    && curl -sfI "https://registry.npmjs.org/1xops/-/1xops-$V.tgz" >/dev/null && break
+    && curl -sfI "https://registry.npmjs.org/1xops/-/1xops-$V.tgz" >/dev/null && served=1 && break
   sleep 10
 done
+[ -n "$served" ] || echo "release: PyPI or npm does not serve v$V after 5 minutes; proving anyway (a lagging channel retries)"
 proof=tmp/evidence-$V.md
 set +e; bash scripts/verify-release.sh "$V" | tee "$proof"; failed=${PIPESTATUS[0]}; set -e
 [ "$failed" -eq 0 ] || { echo "release: v$V is published but $failed check(s) failed; the story stays open"; exit 1; }

@@ -4,13 +4,29 @@
 //   ONEXOPS_DIR=.                 project or tenant folder (team, local)
 //   ONEXOPS_CONNECTORS=aws,itsm   built-in profiles, or paths to your own .json profiles
 //   AWS_REGION=ap-southeast-2     every other KEY=value fills a ${KEY} in the profiles
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, dirname, resolve, sep } from 'node:path';
 import { SCOPES, dumps } from './settings.mjs';
 
 export const DEFAULT_FILE = '.env.1xops';
 const VAR = /\$\{([A-Z0-9_]+)(?::-[^}]*)?\}/g;
 const KEY = /^[A-Z_][A-Z0-9_]*$/;
-const SECRET_HINTS = ['TOKEN', 'SECRET', 'PASSWORD', 'API_KEY'];
+const SECRET_HINTS = ['TOKEN', 'SECRET', 'PASSWORD', 'PASSWD', 'API_KEY', 'PRIVATE_KEY', 'CREDENTIAL'];
+// A value that is itself a credential, whatever its key: AWS access key, GitHub, Slack, Atlassian token, PEM key.
+const SECRET_VALUE = /\b(AKIA|ASIA)[A-Z0-9]{16}\b|\b(ghp|gho|ghs|ghu|github_pat)_[A-Za-z0-9_]{20,}|\bxox[abposr]-|ATATT3|-----BEGIN/;
+// Keys that change how a shell or a program starts: `1xops env` would export them, so they are refused.
+const UNSAFE_KEYS = new Set(['PATH', 'PROMPT_COMMAND', 'BASH_ENV', 'ENV', 'IFS', 'SHELLOPTS', 'BASHOPTS', 'CDPATH',
+  'NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH', 'PYTHONSTARTUP', 'PYTHONHOME', 'PERL5OPT', 'RUBYOPT',
+  'GIT_SSH_COMMAND', 'EDITOR', 'VISUAL', 'PAGER', 'HOME', 'ZDOTDIR', 'PS1', 'PS2', 'PS3', 'PS4']);
+const UNSAFE_PREFIXES = ['LD_', 'DYLD_', 'BASH_FUNC_'];
+// Sign-in locations a cloned folder must not provide: an AWS config file can run any credential_process.
+const SIGN_IN_PATHS = ['AWS_CONFIG_FILE', 'AZURE_CONFIG_DIR'];
+
+// A path with every existing part's links followed, as Python's Path.resolve() does.
+function real(p) {
+  try { return realpathSync(p); } catch { return dirname(p) === p ? p : resolve(real(dirname(p)), basename(p)); }
+}
 const OWN = new Set(['ONEXOPS_SCOPE', 'ONEXOPS_DIR', 'ONEXOPS_OUT', 'ONEXOPS_CONNECTORS']);
 const KNOWN = new Set([...OWN, 'ONEXOPS_IGNORE']); // IGNORE stays among the values: doctor reads it
 
@@ -56,6 +72,22 @@ export function load(file) {
     }
     if (SECRET_HINTS.some((h) => key.includes(h))) {
       throw new Error(`${file}: ${key} looks like a secret; keep it in your keychain or sign-in, not in this file`);
+    }
+  }
+  for (const [key, value] of Object.entries(pairs)) {
+    if (UNSAFE_KEYS.has(key) || UNSAFE_PREFIXES.some((p) => key.startsWith(p))) {
+      throw new Error(`${file}: ${key} changes how a shell or program starts; it does not belong in this file`);
+    }
+    if (SECRET_VALUE.test(value)) {
+      throw new Error(`${file}: the value of ${key} looks like a key or token; keep it in your keychain or sign-in, not in this file`);
+    }
+    if (SIGN_IN_PATHS.includes(key) && value) {
+      const folder = real(dirname(resolve(file)));
+      const expanded = value === '~' || value.startsWith('~/') ? homedir() + value.slice(1) : value;
+      const target = real(resolve(folder, expanded));
+      if (target === folder || target.startsWith(folder + sep)) {
+        throw new Error(`${file}: ${key} points inside this folder; keep sign-in files outside it (for example ~/.aws/tenants/<tenant>/config), so a copied folder cannot run its own sign-in commands`);
+      }
     }
   }
   const scope = pairs.ONEXOPS_SCOPE ?? 'team';

@@ -1,6 +1,6 @@
 ---
 name: vendor-review
-description: Review a vendor for a tenant: total cost, risk, contract status and a renew, replace or negotiate recommendation. Use when the user says "review this vendor", "should we renew", "compare vendors", "vendor TCO", or "contract renewal". Reads the active tenant's settings from tenants/<name>/tenant.env.
+description: Review a vendor for a tenant: total cost, risk, contract status and a renew, replace or negotiate recommendation. Use when the user says "review this vendor", "should we renew", "compare vendors", "vendor TCO", or "contract renewal". Reads the active tenant's settings from tenants/<name>/tenant.env. Prefer it to operations:vendor-review, the generic version, whenever a 1xops tenant is set up.
 argument-hint: "<vendor name or proposal>"
 ---
 
