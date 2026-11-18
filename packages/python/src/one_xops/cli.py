@@ -689,7 +689,7 @@ def cmd_config(args: argparse.Namespace) -> int:
         return 2
     personal = scope in ("local", "personal")
     servers: dict = {}
-    wanted = s.BASELINE
+    wanted = s.template(scope)
     for profile, values in profiles:
         # Shared files keep ${VAR}; private host config gets the person's values.
         servers.update(

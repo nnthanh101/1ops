@@ -8,60 +8,6 @@ import { fileURLToPath } from 'node:url';
 export const HOST = 'claude'; // host CLI binary and config folder name (technical identifier)
 export const SCOPES = ['org', 'team', 'local', 'personal'];
 
-const MARKETPLACES = {
-  '1ops': { source: { source: 'github', repo: 'nnthanh101/1xops' } },
-  'knowledge-work-plugins': { source: { source: 'github', repo: 'anthropics/knowledge-work-plugins' } },
-};
-
-// Baseline every scope receives: the plugin, its base dependency, no secret reads,
-// and a person's yes before anything leaves the machine or rewrites history.
-export const BASELINE = {
-  extraKnownMarketplaces: MARKETPLACES,
-  enabledPlugins: { '1xops@1ops': true, 'operations@knowledge-work-plugins': true },
-  permissions: {
-    deny: ['Read(./.env)', 'Read(./.env.*)', 'Read(./**/.env)', 'Read(./**/.env.*)'],
-    ask: [
-      'Bash(git push *)',
-      'Bash(git reset --hard *)',
-      'Bash(git tag *)',
-      'Bash(gh pr merge *)',
-      'Bash(gh release *)',
-      'Bash(terraform apply *)',
-      'Bash(terraform destroy *)',
-      'Bash(aws * create-*)',
-      'Bash(aws * delete-*)',
-      'Bash(aws * put-*)',
-      'Bash(aws * update-*)',
-      'Bash(aws * modify-*)',
-      'Bash(aws * terminate-*)',
-      'Bash(aws * start-*)',
-      'Bash(aws * stop-*)',
-      'Bash(aws * attach-*)',
-      'Bash(aws * detach-*)',
-      'Bash(aws * tag-*)',
-      'Bash(aws * untag-*)',
-      'Bash(aws s3 cp *)',
-      'Bash(aws s3 mv *)',
-      'Bash(aws s3 rm *)',
-      'Bash(aws s3 sync *)',
-      'Bash(aws cloudformation deploy *)',
-      'Bash(az * create*)',
-      'Bash(az * delete*)',
-      'Bash(az * update*)',
-      'Bash(az * start*)',
-      'Bash(az * stop*)',
-      'Bash(az * restart*)',
-      'Bash(az * deallocate*)',
-      'Bash(az * assign*)',
-      'Bash(az * add*)',
-      'Bash(az * remove*)',
-      'Bash(az * import*)',
-      'Bash(az * invoke*)',
-      'Bash(az rest *)',
-    ],
-  },
-};
-
 export function managedDir() {
   if (process.platform === 'darwin') return '/Library/Application Support/ClaudeCode';
   if (process.platform === 'win32') return 'C:/Program Files/ClaudeCode';
@@ -105,6 +51,15 @@ export function merge(existing, incoming) {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PROFILE_DIRS = [path.join(here, '..', 'profiles'), path.join(here, '..', '..', 'python', 'src', 'one_xops', 'profiles')];
 const profileDir = () => PROFILE_DIRS.find((d) => existsSync(d));
+
+// The rules each scope receives live in templates/settings/{org,team,local,personal}.json, one file per scope,
+// compared on one page in templates/settings/README.md. A build copies them next to this package.
+const TEMPLATE_DIRS = [path.join(here, '..', 'templates', 'settings'), path.join(here, '..', '..', '..', 'templates', 'settings')];
+export function template(scope) {
+  const dir = TEMPLATE_DIRS.find((d) => existsSync(d));
+  return JSON.parse(readFileSync(path.join(dir, `${scope}.json`), 'utf8'));
+}
+export const BASELINE = template('team'); // the team rules, for callers that read them as a constant
 
 export function builtinProfiles() {
   return readdirSync(profileDir()).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
