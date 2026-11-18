@@ -32,7 +32,7 @@ uv tool install 1xops     # or: npm install -g 1xops  (Node.js only, no Python)
 1xops setup               # choose connectors; every change is shown before it is written
 ```
 
-Then, in your assistant, run `/1xops:check`.
+Then, in your assistant, run `/1xops:check`. Free and included: `/1xops:tenant-setup` for one settings file per tenant, then `/1xops:change-request`, `/1xops:vendor-review`, `/1xops:process-doc`, `/1xops:capacity-plan` and `/1xops:compliance-tracking`, each drafted for that tenant and filed only after your yes.
 
 **Upgrade to the enterprise edition:** buy it at [shop.oceansoft.io](https://shop.oceansoft.io), download the bundle from your order, then run `1xops install --edition enterprise --file 1xops-enterprise-x.y.z.tar.gz --yes`. Same `/1xops:*` names, one plugin: the free edition is replaced, nothing to relearn. `1xops doctor` shows the installed edition. It shows each connector as **ready**, **signed out** or **missing**, with the exact fix, and changes nothing. The same check runs on the command line as `1xops doctor`. See [setup](docs/setup.md).
 
