@@ -4,7 +4,7 @@
 
 1xops is a free, open-source toolkit from [OceanSoft.io](https://www.oceansoft.io) for engineering teams on AWS, Azure and AI services. It connects your team's assistant to your cloud accounts and your Jira and Confluence, read-only, in a few minutes, for one person, a team or a whole organisation.
 
-> **Status:** v0.2 is published on [PyPI](https://pypi.org/project/1xops/), [npm](https://www.npmjs.com/package/1xops), [Docker Hub](https://hub.docker.com/r/nnthanh101/1xops) and [ghcr.io](https://github.com/users/nnthanh101/packages/container/package/1xops).
+> **Status:** v0.3.1 is published on [PyPI](https://pypi.org/project/1xops/), [npm](https://www.npmjs.com/package/1xops), [Docker Hub](https://hub.docker.com/r/nnthanh101/1xops) and [ghcr.io](https://github.com/users/nnthanh101/packages/container/package/1xops).
 
 ## What you can do today
 
@@ -14,13 +14,26 @@
 | An engineer | A check of what is installed and signed in on your machine, with the fix for anything missing |
 | A security or compliance lead | Connections to your cloud accounts and Jira that can read but not change anything, and a preview of every change before it is made |
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `1xops doctor` | Each tool, sign-in and connector as ready, check, signed out, wrong account or missing, with a score and one fix each. Account and Azure IDs masked. Changes nothing |
+| `1xops doctor --brief` | Only the connectors that are not ready, one line each; the plugin runs it when a session starts |
+| `1xops doctor --probe` | Also sends one request to each connector that signs in with a header token, to see if it answers |
+| `1xops install --yes` | Adds the marketplaces and installs the 1xops plugin |
+| `1xops setup` | Guided: asks a few questions, writes `.env.1xops`, signs in and checks access is read-only |
+| `1xops config --scope org\|team\|local\|personal` | Settings and connectors for a scope; shows the change, writes it with `--yes` |
+| `1xops env` | Export lines for the values in `.env.1xops` |
+| `1xops tenants [FOLDER]` | The status of every tenant folder under a folder |
+| `1xops connectors` | The built-in connectors (aws, azure, itsm), their servers and the `.env.1xops` keys each needs |
+
 ## Planned
 
-| Outcome | For | Milestone |
+| Outcome | For | Story |
 |---|---|---|
-| Every session starts by naming the broken connectors, with the fix | SREs, on-call engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
-| The assistant asks before any AWS or Azure write, or a call on an expired sign-in or the wrong account | Cloud engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
-| Runbooks, change requests, status reports and risk assessments from your own tools, read-only, in 15 minutes | Platform engineers | [v0.3](https://github.com/nnthanh101/1xops/milestone/2) |
+| The assistant asks before any AWS or Azure write, or a call on an expired sign-in or the wrong account | Cloud engineers | [1XOPS-010](https://github.com/nnthanh101/1xops/issues/43) |
+| Runbooks, change requests, status reports and risk assessments from your own tools, read-only, in 15 minutes | Platform engineers | [1XOPS-011](https://github.com/nnthanh101/1xops/issues/48) |
 
 Cost checks, change requests from a Terraform plan, AI spend, evidenced runbooks and status from the project board are in the enterprise edition at [shop.oceansoft.io](https://shop.oceansoft.io).
 

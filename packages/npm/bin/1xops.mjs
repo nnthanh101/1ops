@@ -12,7 +12,7 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 const HELP = `Usage: 1xops <command> [options]
 
   doctor     check prerequisites, sign-in and connectors    [--aws-profile NAME] [--file PATH]
-                                                             [--brief] [--hook] [--within SECONDS]
+                                                             [--brief] [--hook] [--within SECONDS] [--probe]
   install    add the marketplaces and install the plugin    [--scope user|project|local] [--edition free|enterprise]
                                                              [--file BUNDLE] [--yes]
   setup      guided setup: asks questions, writes ${DEFAULT_FILE}   [--file PATH]
@@ -20,7 +20,7 @@ const HELP = `Usage: 1xops <command> [options]
                                                              [--out DIR] [--connectors NAME...] [--file PATH] [--yes]
   env        print export lines for the values in ${DEFAULT_FILE}    [--file PATH]
   tenants    status of every tenant folder under a folder  [FOLDER]
-  profiles   list built-in connector profiles
+  connectors list the built-in connectors: aws, azure, itsm
 
 Nothing changes unless you pass --yes.`;
 
@@ -36,7 +36,7 @@ if (!command || command === '--help' || command === '-h') {
 }
 
 const OPTIONS = {
-  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE }, brief: { type: 'boolean', default: false }, hook: { type: 'boolean', default: false }, within: { type: 'string' } },
+  doctor: { 'aws-profile': { type: 'string' }, file: { type: 'string', default: DEFAULT_FILE }, brief: { type: 'boolean', default: false }, hook: { type: 'boolean', default: false }, within: { type: 'string' }, probe: { type: 'boolean', default: false } },
   install: { scope: { type: 'string', default: 'user' }, edition: { type: 'string', default: 'free' }, file: { type: 'string' }, yes: { type: 'boolean', default: false } },
   setup: { file: { type: 'string', default: DEFAULT_FILE } },
   config: {
@@ -48,7 +48,8 @@ const OPTIONS = {
     yes: { type: 'boolean', default: false },
   },
   env: { file: { type: 'string', default: DEFAULT_FILE } },
-  profiles: {},
+  connectors: {},
+  profiles: {}, // deprecated in 0.4: still works, says the new name
   tenants: {},
 };
 if (!(command in OPTIONS)) {
@@ -98,6 +99,7 @@ const handlers = {
   config: () => cmd.config(opts),
   env: () => cmd.env(opts),
   tenants: () => cmd.tenants(opts),
-  profiles: () => cmd.profiles(),
+  connectors: () => cmd.connectors(),
+  profiles: () => { console.error('1xops profiles is deprecated: use 1xops connectors'); return cmd.connectors(); },
 };
 process.exit(await handlers[command]());

@@ -93,6 +93,8 @@
       "Read(~/.aws/sso/cache/**)",
       "Read(~/.azure/**)",
       "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.azure-reader/**)",
       "Bash(npm publish *)",
       "Bash(uv publish *)",
       "Bash(git push --force *)",

@@ -10,7 +10,7 @@
     ONEXOPS_IGNORE=gmail,google calendar  # optional: connectors the session start never names
 
 Every other KEY=value line is a value for the ${KEY} references in the connector profiles
-(see `1xops profiles`). Plain KEY=value, so the shell, Python and Node.js all read it natively.
+(see `1xops connectors`). Plain KEY=value, so the shell, Python and Node.js all read it natively.
 """
 
 from __future__ import annotations
@@ -91,7 +91,9 @@ def parse(text: str, where: str = ".env") -> dict[str, str]:
         key, sep, value = line.partition("=")
         key, value = key.strip(), value.strip()
         if not sep or not KEY.match(key):
-            raise ValueError(f"{where}:{n}: expected KEY=value with an upper-case KEY")
+            raise ValueError(
+                f"{where}:{n}: expected KEY=value with an upper-case KEY: fix that line, or run 1xops setup"
+            )
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
             value = value[1:-1]
         else:

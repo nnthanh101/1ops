@@ -49,7 +49,10 @@ jobs:
           "$v" plugin validate --strict .
           "$v" plugin validate --strict plugins/1xops
       - name: Upstream link resolves
-        run: test -f plugins/operations/.claude-plugin/plugin.json
+        run: |
+          for p in plugins/*/; do
+            test -f "$p.claude-plugin/plugin.json" || { echo "$p does not resolve: submodule or upstream moved it"; exit 1; }
+          done
 
   test-python:
     name: "Test: Python"
@@ -135,6 +138,8 @@ jobs:
           py=$(grep -E '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
           js=$(node -p "require('./packages/npm/package.json').version")
           test "$py" = "$js" || { echo "pyproject $py != package.json $js"; exit 1; }
+          pl=$(node -p "require('./plugins/1xops/.claude-plugin/plugin.json').version")
+          test "$py" = "$pl" || { echo "pyproject $py != plugin.json $pl: installed plugins would not update"; exit 1; }
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             test "${GITHUB_REF#refs/tags/v}" = "$py" || { echo "tag != $py"; exit 1; }
           fi

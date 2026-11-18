@@ -2,7 +2,7 @@
 
 Installs the local build the customer's way (uv tool install, npm install -g) in clean containers, as a non-root user
 with no cloud account, so no private name can reach a screenshot. Drives every command in a real terminal (a pty):
-the setup wizard from scratch then the check, doctor, profiles and a config preview. For each: the exit code, the
+the setup wizard from scratch then the check, doctor, connectors and a config preview. For each: the exit code, the
 seconds, and these checks: output printed; no literal [markup]; no table row wrapped; nothing wider than the terminal;
 piped output has no colour codes and is byte-identical between Python and Node.js. Writes OUT/report.md and one SVG
 screenshot per run (rendered by rich from the captured bytes). Exit 0 only when every check passes.
@@ -43,10 +43,19 @@ RUNS = [  # name, shell command in the container, answers, expected exit codes
     ("doctor-first-run", "1xops doctor", [], {0, 1}),
     ("setup-then-check", "1xops setup && 1xops doctor", WIZARD, {0, 1}),
     ("doctor-brief", TENANT + "1xops doctor --brief", [], {0}),
-    ("profiles", "1xops profiles", [], {0}),
+    ("connectors", "1xops connectors", [], {0}),
     ("config-preview", "1xops config --scope team --dir . --connectors aws itsm", [], {0}),
+    # A hand edit drops a rule; config repairs it and keeps the edited file as .bak; a second run changes nothing.
+    ("config-keeps-bak", "1xops config --scope team --dir . --yes >/dev/null && sed -i 's|config/gh|config/gx|' "
+     ".claude/settings.json && 1xops config --scope team --dir . --yes && 1xops config --scope team --dir . --yes "
+     "&& ls -a .claude", [], {0}),
 ]
-PIPED = ["1xops doctor", TENANT + "1xops doctor --brief", TENANT + "1xops doctor --hook --within 4", "1xops profiles", "1xops config --scope team --dir . --connectors aws itsm"]
+# What `1xops config` writes for each scope must equal the committed template, byte for byte.
+WRITES = {"team": "1xops config --scope team --dir . --yes >/dev/null && cat .claude/settings.json",
+          "local": "1xops config --scope local --dir . --yes >/dev/null && cat .claude/settings.local.json",
+          "org": "1xops config --scope org --out o --yes >/dev/null && cat o/managed-settings.json",
+          "personal": "1xops config --scope personal --yes >/dev/null && cat ~/.claude/settings.json"}
+PIPED = ["1xops doctor", TENANT + "1xops doctor --brief", TENANT + "1xops doctor --hook --within 4", "1xops connectors", "1xops config --scope team --dir . --connectors aws itsm"]
 
 
 def docker(image: str, cmd: str, tty: bool, name: str = "") -> list[str]:
@@ -147,10 +156,16 @@ def main(out: Path) -> int:
             problems += [] if py and py == js else ["connector rows differ or are empty"]
         else:
             problems += [] if py == js else ["PyPI and npm differ"]
-        if cmd == "1xops profiles" and re.search(rb"^\xe2\x94\x82 +\xe2\x94\x82", py, re.M):
+        if cmd == "1xops connectors" and re.search(rb"^\xe2\x94\x82 +\xe2\x94\x82", py, re.M):
             problems.append("piped table wrapped a row")
         failures += bool(problems)
         rows.append(f"| both, piped | `{cmd}` | | | {'; '.join(problems) or ('pass: same connector rows' if cmd == '1xops doctor' else 'pass: byte-identical') + ', no colour codes'} | |")
+    for channel, image in IMAGES.items():
+        for scope, cmd in WRITES.items():
+            p = subprocess.run(docker(image, cmd, tty=False), capture_output=True, check=False)
+            same = p.stdout == Path(f"templates/settings/{scope}.json").read_bytes()
+            failures += not same
+            rows.append(f"| {channel}, piped | `{cmd}` | {p.returncode} | | {'pass: equals the template' if same else 'differs from the template'} | |")
     report = [
         f"**1xops UX proof, {time.strftime('%Y-%m-%dT%H:%MZ', time.gmtime())}**: local build installed the customer's way "
         f"in clean containers, non-root, no cloud account; a {WIDTH}-column terminal.",

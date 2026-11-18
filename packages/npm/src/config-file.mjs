@@ -55,7 +55,7 @@ export function parse(text, where = '.env') {
     const eq = line.indexOf('=');
     const key = eq === -1 ? line : line.slice(0, eq).trim();
     let value = eq === -1 ? '' : line.slice(eq + 1).trim();
-    if (eq === -1 || !KEY.test(key)) throw new Error(`${where}:${i + 1}: expected KEY=value with an upper-case KEY`);
+    if (eq === -1 || !KEY.test(key)) throw new Error(`${where}:${i + 1}: expected KEY=value with an upper-case KEY: fix that line, or run 1xops setup`);
     if (value.length >= 2 && value[0] === value.at(-1) && `'"`.includes(value[0])) value = value.slice(1, -1);
     else value = value.split(' #')[0].trimEnd();
     pairs[key] = value;

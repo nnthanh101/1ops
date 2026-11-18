@@ -88,7 +88,13 @@ export function loadProfile(nameOrPath) {
 export function readJson(file) {
   if (!existsSync(file)) return {};
   const text = readFileSync(file, 'utf8');
-  return text.trim() ? JSON.parse(text) : {};
+  if (!text.trim()) return {};
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* reported below */ }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw new Error(`${file} is not a valid settings file (JSON object). Fix it, or rename it and run again; nothing was changed`);
+  }
+  return data;
 }
 
 export const dumps = (data) => `${JSON.stringify(data, null, 2)}\n`;
