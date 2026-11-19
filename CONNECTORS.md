@@ -154,19 +154,19 @@ fills it, and 1xops checks that tool's identity.
 <details>
 <summary><b>Sources and sync check</b> (13 plugin files)</summary>
 
-[customer-support](upstream/knowledge-work-plugins/customer-support/CONNECTORS.md) ·
-[data](upstream/knowledge-work-plugins/data/CONNECTORS.md) ·
-[design](upstream/knowledge-work-plugins/design/CONNECTORS.md) ·
-[engineering](upstream/knowledge-work-plugins/engineering/CONNECTORS.md) ·
-[enterprise-search](upstream/knowledge-work-plugins/enterprise-search/CONNECTORS.md) ·
-[finance](upstream/knowledge-work-plugins/finance/CONNECTORS.md) ·
-[human-resources](upstream/knowledge-work-plugins/human-resources/CONNECTORS.md) ·
-[legal](upstream/knowledge-work-plugins/legal/CONNECTORS.md) ·
-[marketing](upstream/knowledge-work-plugins/marketing/CONNECTORS.md) ·
-[operations](upstream/knowledge-work-plugins/operations/CONNECTORS.md) ·
-[product-management](upstream/knowledge-work-plugins/product-management/CONNECTORS.md) ·
-[productivity](upstream/knowledge-work-plugins/productivity/CONNECTORS.md) ·
-[sales](upstream/knowledge-work-plugins/sales/CONNECTORS.md)
+[customer-support](plugins/customer-support/CONNECTORS.md) ·
+[data](plugins/data/CONNECTORS.md) ·
+[design](plugins/design/CONNECTORS.md) ·
+[engineering](plugins/engineering/CONNECTORS.md) ·
+[enterprise-search](plugins/enterprise-search/CONNECTORS.md) ·
+[finance](plugins/finance/CONNECTORS.md) ·
+[human-resources](plugins/human-resources/CONNECTORS.md) ·
+[legal](plugins/legal/CONNECTORS.md) ·
+[marketing](plugins/marketing/CONNECTORS.md) ·
+[operations](plugins/operations/CONNECTORS.md) ·
+[product-management](plugins/product-management/CONNECTORS.md) ·
+[productivity](plugins/productivity/CONNECTORS.md) ·
+[sales](plugins/sales/CONNECTORS.md)
 
 Every placeholder a plugin uses must appear in the table below. This lists any that are missing (no output means
 the catalogue is in sync):

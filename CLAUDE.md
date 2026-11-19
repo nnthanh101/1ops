@@ -10,12 +10,11 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
   Bump the digest when runbooks is rebuilt. Never a separate base image for 1xops.
 - Settings live in `.env.1xops` (non-secret `KEY=value`; secret-looking keys are refused). Guided setup: `1xops setup`.
 - Dependencies: latest stable, official only. A new third party needs the owner's yes and a line in `NOTICE`.
-- Customers see one plugin, `1xops`. `upstream/<vendor>/` is the library (free, open-source plugins, one pinned
-  submodule per vendor, never shipped; `upstream-bump.yml` moves every pin monthly). We filter it, pick the best and
-  bring a pick into 1xops as a `/1xops:<outcome>` skill (copied, licence and NOTICE line kept) or a declared
-  dependency. `plugins/` holds only 1xops and reviewed copies, never a link; `.claude-plugin/marketplace.json` decides
-  what ships (CI refuses a link). Every skill or server that can change things is reviewed before it ships; each
-  decision, picked or not, goes in `upstream/README.md`. Guides: `plugins/README.md`, `upstream/README.md`.
+- `plugins/` is the one catalogue people build from: our plugins as folders, library plugins as links into a pinned
+  `upstream/` submodule (`knowledge-work-plugins`, `agent-toolkit-for-aws`). `.claude-plugin/marketplace.json` decides
+  what ships: only a reviewed folder, never a link (CI refuses one). A new plugin is a copy of a library plugin into
+  its own folder, renamed into its namespace, with its licence and NOTICE line; every skill or server that can change
+  things is reviewed before it is listed. Guide: `plugins/README.md`.
 
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.

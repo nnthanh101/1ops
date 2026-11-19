@@ -1,12 +1,15 @@
-# Plugins
+# Plugins: one catalogue to build from
 
-This folder holds only what customers get: the `1xops` plugin, and any plugin copied from the library and reviewed. [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) decides what ships, and lists only folders here, never a link (the Release workflow refuses one).
+Every plugin you can build from sits in this folder, so you start a new plugin from proven, free, open-source parts instead of from scratch.
 
-**Where plugins come from.** Free, open-source plugins from several vendors sit in [`upstream/`](../upstream/README.md), each vendor a pinned submodule that is never shipped. We filter that library, pick the best, and bring a pick into `1xops` in one of two ways:
+| Kind | In this folder as | Ships to customers |
+|---|---|---|
+| **Ours** | a folder (`1xops`) | yes, when listed in [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) |
+| **Library** | a link into `upstream/` (`upstream/knowledge-work-plugins`, `upstream/agent-toolkit-for-aws`), each pinned | no, never: a source to copy from |
+| **Your own** | a folder you copied from the library, renamed into your namespace | only after review, and only once it is listed in `marketplace.json` |
 
-- **As a skill:** copy the part you need into `plugins/1xops/skills/`, name it `/1xops:<outcome>`, keep its licence, and add its line to `NOTICE`.
-- **As a dependency:** list the whole plugin in `plugins/1xops/.claude-plugin/plugin.json`; it installs from its own vendor's marketplace with 1xops. The 12 base plugins come in this way.
+**Build your own.** Start from a library plugin with `cowork-plugin-management` (a `1xops plugin new --from <library>/<name>` command is planned). It copies the plugin once into its own folder here, under your name, with its licence and NOTICE line kept. A link never changes into a copy in place: the copy is a new folder, and the link stays as the library entry.
 
-**Review before it ships.** A library plugin can carry servers or steps that change things; for example, some AWS plugins use a server that can call any AWS API, so only a read-only role keeps them read-only. Check every skill and server of a pick, and run `1xops doctor`, before it is listed. Record the decision, picked or not, in [`upstream/README.md`](../upstream/README.md).
+**Review before it ships.** A library plugin can carry servers that change things. For example, the AWS library's `aws-core`, `aws-data-analytics` and `aws-startup-advisor` use a server that can call any AWS API, so a read-only role is what keeps them read-only. Check every skill and server of a copy, and run `1xops doctor`, before you list it in `marketplace.json`.
 
-**Build your own.** Start from a library plugin with `cowork-plugin-management` (installed with 1xops; a `1xops plugin new --from <vendor>/<name>` command is planned). It copies the plugin once into its own folder under your name, with its licence and NOTICE line.
+**Library updates.** A library changes only when its pin in `upstream/` is moved; the links follow that pin. Copies never change by themselves.

@@ -16,7 +16,7 @@ Not copied into this repository or its packages unless stated. Each keeps its ow
 licence. Every component below was approved by the maintainer on 2026-11-17; any new
 third-party component needs the maintainer's approval first.
 
-Upstream library (git submodule, upstream/knowledge-work-plugins; never shipped, a source to pick from)
+Upstream (git submodule, upstream/knowledge-work-plugins; plugins/operations links to it)
   knowledge-work-plugins   https://github.com/anthropics/knowledge-work-plugins   Apache-2.0
   The 1xops plugin declares 12 of its plugins as dependencies, installed from that marketplace, not copied:
   operations, cowork-plugin-management, customer-support, data, engineering, enterprise-search, finance,
