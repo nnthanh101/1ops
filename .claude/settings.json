@@ -96,6 +96,30 @@
         "source": "github",
         "repo": "aws/agent-toolkit-for-aws"
       }
+    },
+    "shopify-ai-toolkit": {
+      "source": {
+        "source": "github",
+        "repo": "Shopify/Shopify-AI-Toolkit"
+      }
+    },
+    "vercel": {
+      "source": {
+        "source": "github",
+        "repo": "vercel/vercel-plugin"
+      }
+    },
+    "hashicorp": {
+      "source": {
+        "source": "github",
+        "repo": "hashicorp/agent-skills"
+      }
+    },
+    "superpowers-dev": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers"
+      }
     }
   },
   "enabledPlugins": {
@@ -111,6 +135,10 @@
     "marketing@knowledge-work-plugins": true,
     "product-management@knowledge-work-plugins": true,
     "sales@knowledge-work-plugins": true,
-    "small-business@knowledge-work-plugins": true
+    "small-business@knowledge-work-plugins": true,
+    "shopify-plugin@shopify-ai-toolkit": true,
+    "vercel-plugin@vercel": true,
+    "terraform@hashicorp": true,
+    "superpowers@superpowers-dev": true
   }
 }

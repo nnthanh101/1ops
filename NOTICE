@@ -32,6 +32,8 @@ Upstream libraries approved by the maintainer on 2026-11-20 (git submodules unde
   Copyright Vercel, Inc.
   agent-skills             https://github.com/hashicorp/agent-skills              MPL-2.0      plugins/terraform
   Copyright HashiCorp. MPL-2.0 is file-level copyleft: a copied file stays under MPL-2.0 and its source stays available.
+  superpowers              https://github.com/obra/superpowers                    MIT          plugins/superpowers
+  Copyright Jesse Vincent.
 
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT

@@ -23,3 +23,8 @@
 	url = https://github.com/hashicorp/agent-skills.git
 	branch = main
 	ignore = untracked
+[submodule "upstream/superpowers"]
+	path = upstream/superpowers
+	url = https://github.com/obra/superpowers.git
+	branch = main
+	ignore = untracked

@@ -4,7 +4,7 @@ This folder is the catalogue. It holds a link to each selected free, open-source
 
 | Kind | In this folder as | Ships to customers |
 |---|---|---|
-| **Library** | a link into `upstream/<vendor>/` (`knowledge-work-plugins`, `agent-toolkit-for-aws`, `shopify-ai-toolkit`, `vercel-plugin`, `hashicorp-agent-skills`; more vendors to come), each pinned | never: a part to build from |
+| **Library** | a link into `upstream/<vendor>/` (`knowledge-work-plugins`, `agent-toolkit-for-aws`, `shopify-ai-toolkit`, `vercel-plugin`, `hashicorp-agent-skills`, `superpowers`; more vendors to come), each pinned | never: a part to build from |
 | **Worked example** | a folder: `1xops` | yes: it is listed in [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) |
 | **Your own** | a folder you built from the library, under your own name | only after review, once you list it in your `marketplace.json` |
 
