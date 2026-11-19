@@ -28,3 +28,8 @@
 	url = https://github.com/obra/superpowers.git
 	branch = main
 	ignore = untracked
+[submodule "upstream/claude-plugins-official"]
+	path = upstream/claude-plugins-official
+	url = https://github.com/anthropics/claude-plugins-official.git
+	branch = main
+	ignore = untracked

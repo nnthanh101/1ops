@@ -34,6 +34,9 @@ Upstream libraries approved by the maintainer on 2026-11-20 (git submodules unde
   Copyright HashiCorp. MPL-2.0 is file-level copyleft: a copied file stays under MPL-2.0 and its source stays available.
   superpowers              https://github.com/obra/superpowers                    MIT          plugins/superpowers
   Copyright Jesse Vincent.
+  claude-plugins-official  https://github.com/anthropics/claude-plugins-official Apache-2.0   12 Anthropic-built plugins linked in plugins/
+  (claude-code-setup, code-review, pr-review-toolkit, security-guidance, claude-security, feature-dev, code-simplifier,
+  claude-md-management, plugin-dev, skill-creator, hookify, frontend-design); partner plugins in it are not linked.
 
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT
