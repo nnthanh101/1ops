@@ -10,6 +10,11 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
   Bump the digest when runbooks is rebuilt. Never a separate base image for 1xops.
 - Settings live in `.env.1xops` (non-secret `KEY=value`; secret-looking keys are refused). Guided setup: `1xops setup`.
 - Dependencies: latest stable, official only. A new third party needs the owner's yes and a line in `NOTICE`.
+- `plugins/` is the one catalogue people build from: our plugins as folders, library plugins as links into a pinned
+  `upstream/` submodule (`knowledge-work-plugins`, `agent-toolkit-for-aws`). `.claude-plugin/marketplace.json` decides
+  what ships: only a reviewed folder, never a link (CI refuses one). A new plugin is a copy of a library plugin into
+  its own folder, renamed into its namespace, with its licence and NOTICE line; every skill or server that can change
+  things is reviewed before it is listed. Guide: `plugins/README.md`.
 
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.

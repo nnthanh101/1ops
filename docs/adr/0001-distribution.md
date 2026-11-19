@@ -11,8 +11,8 @@ End users should get 1xops with one command, whatever they already use. The free
 
 | Concern | Decision |
 |---|---|
-| Upstream base plugins | Git submodule `upstream/knowledge-work-plugins`, pinned to a commit; `plugins/operations` is a relative link into it. A monthly workflow opens a pull request that moves the pin. |
-| Plugin installs | Unchanged: the marketplace lists only `plugins/1xops`, which depends on the base plugin through its own marketplace. The link is for clones and local development. |
+| Upstream base plugins | Git submodules, each pinned to a commit: `upstream/knowledge-work-plugins` and `upstream/agent-toolkit-for-aws` (added 19 Nov 2026). Each of their plugins is a relative link in `plugins/`, so `plugins/` is the one catalogue to build from. A monthly workflow opens a pull request that moves the `knowledge-work-plugins` pin; the AWS pin is moved by hand (`git submodule update --remote upstream/agent-toolkit-for-aws`) and reviewed the same way. |
+| Plugin installs | `.claude-plugin/marketplace.json` decides what ships, and lists only reviewed folders, never a link (the Release workflow refuses one). Today that is `plugins/1xops`, which depends on the base plugins through their own marketplace. A plugin built from the library is a copy in its own folder, with its licence and NOTICE line. |
 | Command line | One implementation, Python, in `packages/python` (PyPI `1xops`, import `one_xops`, command `1xops`; PyPI refused the earlier name `1ops` as too similar to the existing `iops`). |
 | npm | `packages/npm` is a **native Node.js** command line (Node 24 built-ins, no dependencies) with the same commands and output files as the Python one. Each channel is native to its runtime: npm needs only Node.js, PyPI only Python, the image only Docker (owner decision 17 Nov 2026; the earlier npm launcher, which needed Python and uv, was a mistake). |
 | Container | Built from `packages/python`; published to ghcr.io and mirrored to Docker Hub ([0002](0002-release-identity.md)). |
