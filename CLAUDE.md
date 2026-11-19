@@ -13,10 +13,11 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 
 ## The product: build your own plugin from proven free parts
 - Customers build a plugin from proven, free, open-source plugins of trusted vendors. They can only do that when every
-  part is in one visible place, so `plugins/` is the catalogue: a link to **every** plugin of each `upstream/<vendor>/`
-  submodule (pinned, never shipped: `knowledge-work-plugins`, `agent-toolkit-for-aws`; next Shopify, Vercel, Azure…),
-  beside the plugins we build. Never remove the links, never move the catalogue out of `plugins/`, never narrow it to
-  "only 1xops". A new vendor = a submodule in `upstream/` + one link per plugin (vendor prefix if names clash).
+  part is in one visible place, so `plugins/` is the catalogue: a link to each plugin **the owner selected** from each
+  `upstream/<vendor>/` submodule (pinned, never shipped: `knowledge-work-plugins`, `agent-toolkit-for-aws`; next Shopify,
+  Vercel, Azure…), beside the plugins we build. The owner selects; a session never adds or removes a catalogue link on
+  its own (partner-built plugins are not selected). Never move the catalogue out of `plugins/`, never
+  narrow it to "only 1xops". A new vendor = a submodule in `upstream/` + one link per selected plugin (vendor prefix if names clash).
 - **1xops is the worked example**, one target built from the same catalogue a customer uses; building it proves the DIY
   path end to end. Each customer builds their own 1xops-like plugin the same way, with the same parts and steps: copy a
   library plugin once into its own folder, rename it into its namespace, keep its licence and NOTICE line, review
@@ -109,5 +110,6 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | A release was bumped to 0.4.0 because a command was added; the owner wanted 0.3.2, and the tag had to be removed after the merge | A patch by default; the version is one of the scored options in the release question, asked before the release starts |
 | SSO tiles were reported as passing from clicks with a session already open; two of them (GitHub, Slack) were not SSO at all, and the tenant's status page, which already said so, was not read first | Read the tenant's status page first; a sign-in is ✅ only after a clean test (signed out, then launched); on a failure read the identity provider's sign-in log; report ✅ / 🔑 / 🛠️ / ⏳, without alarm |
 | A connector catalogue was called done while the README the owner named was not synced; a requested doc was hidden in a sibling worktree | Done means every named target is synced, with one status page per tenant and the rest linking to it; a requested doc goes in the owner's checkout. Give the full path and its git state |
+| The catalogue was changed without the owner: 5 partner-built plugins were linked, then bio-research was deleted on a guess | The owner selects the catalogue; a session proposes a link change and makes it only on a yes, and removes only what was named |
 | The DIY rule and README were edited in `../1ops-diy-rule`, a sibling worktree, again after the same lesson | Requested docs, rules and links are written in `~/Projects/1ops` on `develop` and committed; a worktree is only for code that needs the gate |
 | "Customers see only 1xops" was read as "remove the catalogue": all 21 upstream links were deleted from `plugins/` (e68c14e) and had to be reverted | The product is DIY from one visible catalogue; 1xops is its worked example. Keep every link; `marketplace.json`, not the folder, decides what ships. When a request seems to narrow the model, ask before deleting |

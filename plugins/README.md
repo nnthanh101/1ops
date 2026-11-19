@@ -1,6 +1,6 @@
 # Plugins: build your own from proven free parts
 
-This folder is the catalogue. It holds a link to every free, open-source plugin of trusted vendors, beside the plugins built from them, so every part you can build from is in one visible place.
+This folder is the catalogue. It holds a link to each selected free, open-source plugin of trusted vendors, beside the plugins built from them, so every part you can build from is in one visible place.
 
 | Kind | In this folder as | Ships to customers |
 |---|---|---|
