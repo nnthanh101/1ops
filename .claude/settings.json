@@ -17,6 +17,9 @@
       "Bash(git push:*)",
       "Bash(git merge:*)",
       "Bash(git tag:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
       "Bash(git switch -c:*)",
       "Bash(git checkout -b:*)",
       "Bash(git worktree add:*)",
@@ -71,7 +74,43 @@
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./.secrets)"
+      "Read(./.secrets)",
+      "Read(./tenants/*/.env.secrets)"
     ]
+  },
+  "extraKnownMarketplaces": {
+    "1ops": {
+      "source": {
+        "source": "github",
+        "repo": "nnthanh101/1xops"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
+      }
+    },
+    "agent-toolkit-for-aws": {
+      "source": {
+        "source": "github",
+        "repo": "aws/agent-toolkit-for-aws"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "1xops@1ops": true,
+    "operations@knowledge-work-plugins": true,
+    "cowork-plugin-management@knowledge-work-plugins": true,
+    "customer-support@knowledge-work-plugins": true,
+    "data@knowledge-work-plugins": true,
+    "engineering@knowledge-work-plugins": true,
+    "enterprise-search@knowledge-work-plugins": true,
+    "finance@knowledge-work-plugins": true,
+    "human-resources@knowledge-work-plugins": true,
+    "marketing@knowledge-work-plugins": true,
+    "product-management@knowledge-work-plugins": true,
+    "sales@knowledge-work-plugins": true,
+    "small-business@knowledge-work-plugins": true
   }
 }

@@ -11,3 +11,4 @@ node_modules/
 .env.1xops
 packages/npm/profiles/
 tmp/
+.claude/settings.local.json

@@ -19,8 +19,11 @@ Scopes, the `.env.1xops` format and the connector profiles are in the [command-l
 ```bash
 git clone --recurse-submodules https://github.com/nnthanh101/1xops && cd 1xops
 git config core.hooksPath .githooks      # secret scan, commit message and quick checks, as advice
+git config submodule.recurse true       # every pull also updates upstream/
 # every push from a branch other than develop or main runs the tests locally with act first (.githooks/pre-push)
 ```
+
+Shared settings (permissions, plugin marketplaces, enabled plugins) come from `.claude/settings.json` in Git. Personal additions go in `.claude/settings.local.json`, which Git ignores.
 
 Done means every acceptance criterion is proven on what the customer receives (the published package or the real asset), in a clean environment, with the command and its real output posted on the issue; only the maintainer closes it, and pull requests say `Refs #N`, never `Closes`.
 
