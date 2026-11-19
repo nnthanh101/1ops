@@ -32,9 +32,9 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
-- Deliverables live in `~/Projects/1ops`, tracked by Git, on `develop`. A doc, rule, README or link the owner asks for is
+- Deliverables live in `~/Projects/1xops`, tracked by Git, on `develop`. A doc, rule, README or link the owner asks for is
   written there directly and committed; never in a sibling folder. Only code that needs `task gate` uses a worktree.
-- Git: code works on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
+- Git: code works on `feature/*` in its own worktree (`git worktree add ../1xops-<slug> -b feature/<slug>`), never by
   switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
   delete the branch and the worktree. The session commits and releases, but first asks the owner one question with
   scored options, each with its business value (version, now or hold); on yes it runs `task release STORY=n` end to end, then
@@ -76,7 +76,7 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 - **Tasks `TASK-NNN`** are broken out just in time: tick boxes in the story until it moves to Ready, then sub-issues (type Task).
 - Tags: one `type:`, one `edition:`, one `cap:`, plus `cloud:` when it applies; one milestone per release; free stories on board 15, premium on board 11.
 - **Scaffold, not text.** 5W1H, why, what-if, LEAN/5S/3T, INVEST and the audience check (CEO, CTO, CFO, CDO, CSO; the owner as accountable approver) are the session's checklist for covering every angle. Use them in reasoning and coordination; never write them into issues, the README or docs.
-- Skill: `invest-story` (1ops-enterprise `.claude/skills`).
+- Skill: `invest-story` (1xops-enterprise `.claude/skills`).
 
 ## Mistakes already made here. Do not repeat them
 | Mistake | Rule |
@@ -87,7 +87,7 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | An issue closed by `Closes #13` with criteria unproven | `Refs #N`; proof on the published artifact first |
 | A Dockerfile written from scratch on `python:3.14-slim` (386 MB, unpinned, unlocked) | Reuse the owner's platform images and their conventions first; measure before and after |
 | `1xops doctor` (17 Nov 2026) found the default Azure login on the owner's Mac can change things | Sessions never use the owner's own cloud login; read-only identity only, checked with `1xops doctor` first |
-| 0.2.4 shipped a misaligned table header; a literal `[bold]…[/]`, rows wrapped at 80 columns and 65 profiles listed twice reached the wizard. All 50 unit tests passed | A change to what a person sees is done only when seen: `task ux` (real terminal, clean container, checks + screenshots) passes, and the screenshots are looked at. Skill `visual-verify` (1ops-enterprise) |
+| 0.2.4 shipped a misaligned table header; a literal `[bold]…[/]`, rows wrapped at 80 columns and 65 profiles listed twice reached the wizard. All 50 unit tests passed | A change to what a person sees is done only when seen: `task ux` (real terminal, clean container, checks + screenshots) passes, and the screenshots are looked at. Skill `visual-verify` (1xops-enterprise) |
 | `rich` was removed to make stdout byte-identical, which cost the customer the UX | Byte-identical means the files and piped output. On a terminal, Python uses `rich` to the full (tables, colour, spinner, prompts) and Node.js draws the same natively |
 | Release proof reported registry lag as a product failure, twice | The proof waits for the files an install fetches and retries a channel that printed nothing; it still fails a version that does not exist |
 | A pty capture rendered to SVG was shown as a terminal screenshot | Say what it is. A real screenshot is `screencapture -l` of a Terminal.app or iTerm2 window; without Screen Recording permission, ask the owner to grant it or take it |
@@ -111,5 +111,5 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | SSO tiles were reported as passing from clicks with a session already open; two of them (GitHub, Slack) were not SSO at all, and the tenant's status page, which already said so, was not read first | Read the tenant's status page first; a sign-in is ✅ only after a clean test (signed out, then launched); on a failure read the identity provider's sign-in log; report ✅ / 🔑 / 🛠️ / ⏳, without alarm |
 | A connector catalogue was called done while the README the owner named was not synced; a requested doc was hidden in a sibling worktree | Done means every named target is synced, with one status page per tenant and the rest linking to it; a requested doc goes in the owner's checkout. Give the full path and its git state |
 | The catalogue was changed without the owner: 5 partner-built plugins, bio-research and pdf-viewer were linked though never picked (all removed) | The owner selects the catalogue; a session proposes a link change and makes it only on a yes, and removes only what was named |
-| The DIY rule and README were edited in `../1ops-diy-rule`, a sibling worktree, again after the same lesson | Requested docs, rules and links are written in `~/Projects/1ops` on `develop` and committed; a worktree is only for code that needs the gate |
+| The DIY rule and README were edited in `../1ops-diy-rule`, a sibling worktree, again after the same lesson | Requested docs, rules and links are written in `~/Projects/1xops` on `develop` and committed; a worktree is only for code that needs the gate |
 | "Customers see only 1xops" was read as "remove the catalogue": all 21 upstream links were deleted from `plugins/` (e68c14e) and had to be reverted | The product is DIY from one visible catalogue; 1xops is its worked example. Keep every link; `marketplace.json`, not the folder, decides what ships. When a request seems to narrow the model, ask before deleting |
