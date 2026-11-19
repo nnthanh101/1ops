@@ -148,6 +148,100 @@ ACCESS = {
 }
 
 
+# ── container ───────────────────────────────────────────────────────────────
+
+# In the 1xops image (it sets ONEXOPS_CONTAINER=1), sign-ins are made on the host and mounted in; nothing signs
+# in inside. A marker, not /.dockerenv: CI runners and other containers keep the behaviour of a person's machine.
+CONTAINER = os.environ.get("ONEXOPS_CONTAINER") == "1"
+ON_HOST = " on the host" if CONTAINER else ""
+HOST_ONLY = (
+    s.HOST,
+    "uv",
+    "npx",
+    "docker",
+)  # the person's own machine: in a container, shown only when there
+ENV_FILE = re.compile(r"^\.env(\..+)?$")
+ENV_KEEP = re.compile(r"^\.env\.1xops$|\.(example|sample|template)$")
+
+
+def _tilde(path: str) -> str:
+    home = str(Path.home())
+    return "~" + path[len(home) :] if path == home or path.startswith(home + "/") else path
+
+
+def _mounts() -> dict[str, list[str]]:
+    """Mount point: its options, from the kernel's own list (/proc/self/mountinfo). Empty outside Linux."""
+    try:
+        lines = Path("/proc/self/mountinfo").read_text().splitlines()
+    except OSError:
+        return {}
+    return {
+        f[4].replace("\\040", " "): f[5].split(",")
+        for f in (ln.split(" ") for ln in lines)
+        if len(f) > 5
+    }
+
+
+def _env_files(root: str, depth: int) -> list[str]:
+    """`.env` files under root (names only, never read), `depth` folders down."""
+    try:
+        entries = sorted(os.scandir(root), key=lambda e: e.name)
+    except OSError:
+        return []
+    found = []
+    for e in entries:
+        if (
+            e.is_file(follow_symlinks=False)
+            and ENV_FILE.match(e.name)
+            and not ENV_KEEP.search(e.name)
+        ):
+            found.append(os.path.join(root, e.name))
+        elif depth and e.is_dir(follow_symlinks=False) and e.name not in (".git", "node_modules"):
+            found += _env_files(os.path.join(root, e.name), depth - 1)
+    return found
+
+
+def check_isolation() -> tuple[str, str]:
+    """(status, detail) of what the container can reach besides the read-only sign-in.
+    Reads file names, environment names and mount options only; no file content."""
+    home = str(Path.home())
+    mounts = _mounts()
+    config = os.environ.get("AWS_CONFIG_FILE", "")
+    aws = [m for m in mounts if m.startswith(home + "/.aws") or (config and m == config)]
+    fixes = [f"{_tilde(m)} is writable: mount it with :ro" for m in aws if "ro" not in mounts[m]]
+    ssh = Path(home, ".ssh")
+    if ssh.is_dir() and any(ssh.iterdir()):
+        fixes.append("SSH keys in ~/.ssh: remove that mount")
+    if os.environ.get("SSH_AUTH_SOCK"):
+        fixes.append("an SSH agent is passed in: remove SSH_AUTH_SOCK and its socket mount")
+    for f in dict.fromkeys(
+        filter(None, [os.environ.get("AWS_SHARED_CREDENTIALS_FILE"), f"{home}/.aws/credentials"])
+    ):
+        if Path(f).is_file():
+            fixes.append(f"static AWS credentials file {_tilde(f)}: remove that mount")
+    if os.environ.get("AWS_ACCESS_KEY_ID"):
+        fixes.append("static AWS key in AWS_ACCESS_KEY_ID: remove that -e")
+    if Path(home, ".azure").is_dir():
+        fixes.append(
+            "default Azure login in ~/.azure: remove that mount, mount the Reader's own folder"
+        )
+    envs = list(dict.fromkeys(_env_files(os.getcwd(), 2) + _env_files(home, 0)))
+    if envs:
+        more = ", …" if len(envs) > 3 else ""
+        fixes.append(
+            f"host .env files ({', '.join(map(_tilde, envs[:3]))}{more}): remove that mount"
+        )
+    if fixes:
+        return "check", "; ".join(fixes)
+    return "ready", ", ".join(
+        [
+            "AWS folder read-only" if aws else "no AWS folder",
+            "Azure folder its own" if os.environ.get("AZURE_CONFIG_DIR") else "no Azure folder",
+            "no SSH keys, no static AWS credentials, no host .env files",
+        ]
+    )
+
+
 # ── doctor ──────────────────────────────────────────────────────────────────
 
 
@@ -165,6 +259,8 @@ def check_tools() -> list[tuple[str, bool, bool, str]]:
         ("az", False),
     ]:
         path = shutil.which(name)
+        if CONTAINER and name in HOST_ONLY and not path:
+            continue
         if not path:
             rows.append((name, required, False, "not found on PATH"))
             continue
@@ -198,7 +294,9 @@ def check_edition() -> tuple[str, bool, bool, str]:
     return ("edition", False, False, "plugin not installed: 1xops install --yes")
 
 
-READER_HINT = "use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login"
+READER_HINT = (
+    f"use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login{ON_HOST}"
+)
 
 
 def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
@@ -226,7 +324,7 @@ def check_sign_in(aws_profile: str | None) -> list[tuple[str, bool, bool, str]]:
             )
             rows.append(("aws access", False, access == "read", ACCESS[access]))
         else:
-            rows.append(("aws sign-in", False, False, "not signed in (aws sso login)"))
+            rows.append(("aws sign-in", False, False, f"not signed in (aws sso login{ON_HOST})"))
     if shutil.which("az") and not os.environ.get("AZURE_CONFIG_DIR"):
         # the default login is never read: it is a person's own, and it may change things
         rows.append(("azure sign-in", False, False, f"not checked: {READER_HINT}"))
@@ -260,12 +358,17 @@ def aws_fix(error: str, profile: str) -> tuple[str, str]:
             "missing",
             f"profile {profile} not found: aws configure sso --profile {profile}, or set AWS_CONFIG_FILE",
         )
+    if re.search(r"read-only file system.*\.aws/cli", error, re.IGNORECASE):
+        return (
+            "check",
+            "mount only the AWS config file and ~/.aws/sso, read-only (README docker run line)",
+        )
     if re.search(
-        r"expired|refresh failed|sso.*token|nocredentials|unable to locate credentials",
+        r"expired|refresh failed|sso.*token|nocredentials|unable to locate credentials|read-only file system",
         error,
         re.IGNORECASE,
     ):
-        return "signed out", f"aws sso login --profile {profile}"
+        return "signed out", f"aws sso login --profile {profile}{ON_HOST}"
     first = next((line for line in error.splitlines() if line.strip()), "AWS identity call failed")
     return "check", first.removeprefix("aws: [ERROR]: ")[:120]
 
@@ -328,7 +431,7 @@ def _aws_connector(var: str, values: dict[str, str]) -> tuple[str, str, str]:
         )
     end = sso_end(profile) if SIGN_IN_ENDS is not None else None
     if end and SIGN_IN_ENDS is not None:
-        SIGN_IN_ENDS[name] = (end, f"aws sso login --profile {profile}")
+        SIGN_IN_ENDS[name] = (end, f"aws sso login --profile {profile}{ON_HOST}")
         detail += f", signed in until {end:%Y-%m-%d %H:%M} UTC"
     return name, "ready" if access == "read" else "check", detail
 
@@ -379,7 +482,7 @@ def _azure_connector(values: dict[str, str] | None = None) -> tuple[str, str, st
     values = values or {}
     if not shutil.which("az"):
         return "azure", "missing", "install the Azure CLI"
-    fix = "az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR"
+    fix = f"az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR{ON_HOST}"
     code, out = _run(["az", "account", "show", "--query", "user.name", "--output", "tsv"])
     if code != 0 or not out:
         return "azure", "signed out", fix
@@ -497,8 +600,8 @@ def check_connectors(file: str, rows: list | None = None) -> list[tuple[str, str
     for key in (
         "AWS_CONFIG_FILE",
         "AZURE_CONFIG_DIR",
-    ):  # this tenant's own, never another tenant's from the shell
-        if cfg["values"].get(key):
+    ):  # this tenant's own, never another tenant's from the shell; in a container, the mount's (docker run -e)
+        if cfg["values"].get(key) and not (CONTAINER and os.environ.get(key)):
             os.environ[key] = os.path.expanduser(cfg["values"][key])
     if not cfg["connectors"]:
         rows.append(
@@ -746,8 +849,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     SIGN_IN_ENDS = {}
     # The identity calls take seconds; a spinner on a terminal, nothing when piped.
     with console.status("Checking tools, sign-ins and connectors (read-only)…"):
-        rows = check_tools() + [check_edition()] + check_sign_in(args.aws_profile)
+        rows = check_tools() + ([] if CONTAINER and not shutil.which(s.HOST) else [check_edition()])
+        rows += check_sign_in(args.aws_profile)
         connectors = connector_rows(args.file, [])
+        isolation = [("isolation", "container", *check_isolation())] if CONTAINER else []
     rows = [r for r in rows if r[0] not in covered_sign_ins(connectors, args.aws_profile)]
     shown = [
         (
@@ -758,7 +863,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
         for name, required, ok, detail in rows
     ]
-    shown += [(name, "connector", status, fix) for name, status, fix in connectors]
+    shown += isolation + [(name, "connector", status, fix) for name, status, fix in connectors]
     table = Table(title=f"1xops {__version__} doctor", title_style="bold")
     for col in ("check", "needed", "result", "detail"):
         table.add_column(col, overflow="fold")

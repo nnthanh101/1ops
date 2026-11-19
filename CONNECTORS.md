@@ -105,7 +105,7 @@ The `os` tenant, checked on **19 Nov 2026** in a real browser and a real termina
 > sign-in, because a live session skips SAML entirely.
 > A row is ✅ only after a clean test.
 >
-> **Status:** ✅ Entra sign-in proven · 🔑 works with the app's own sign-in (Entra SSO is a paid upgrade, not a fault) · 🛠️ set up, being finished · ⏳ waiting for a clean test · 🔜 planned
+> **Status:** ✅ Entra sign-in proven · 🔑 works with the app's own sign-in (Entra SSO is a paid upgrade, not a fault) · 🛠️ set up, being finished · ⏳ waiting for a clean test · ➖ not used by this tenant · 🔜 planned
 
 ### Sign-in layer (Entra ID → My Apps)
 
@@ -119,11 +119,11 @@ The `os` tenant, checked on **19 Nov 2026** in a real browser and a real termina
 | Infracost | Linked tile | — | ✅ honest | one tile left; the plan has no SSO setting | GitHub/Google sign-in until Enterprise |
 | GitHub (org) | own GitHub sign-in (tile is a bookmark) | clean | 🔑 | signed out → tile opens the **public** org page with "Sign in"; `/orgs/<org>/sso` is 404, so the org has no SAML | GitHub Enterprise Cloud for SAML; until then, GitHub sign-in |
 | Slack | own Slack sign-in (Linked tile) | clean | 🔑 | signed out → tile → Slack sign-in offers Google, Apple or an e-mail code only | Slack SAML needs a paid plan |
-| Azure DevOps | Entra native | warm | ⏳ | lands in the org | clean test needs a full Entra sign-out and the owner's sign-in |
-| Microsoft Teams | Entra native | warm | ⏳ | lands signed in | clean test needs a full Entra sign-out and the owner's sign-in |
-| Salesforce (developer org) | SAML, Federation ID | clean | 🛠️ | Entra logs **Success**, Salesforce shows "Single Sign-On Error" | owner signs in with the password; set and verify the Federation ID; Assertion Validator; retest |
+| Azure DevOps | Entra native | clean | ✅ | full Entra sign-out → tile → Microsoft password and MFA → the org with its project | — |
+| Microsoft Teams | Entra native | clean | ✅ | same fresh Entra sign-in → Teams opens signed in | — |
+| Salesforce (developer org) | SAML, Federation ID | clean | 🛠️ | Federation ID was empty; set and read back; still "Single Sign-On Error" while Entra logs `Success`, so a second mismatch remains | owner signs in with the password once; read the SAML Assertion Validator and Login History; fix; retest |
 | HashiCorp Cloud Platform | SAML (SP-initiated) | clean | 🛠️ | URL migration done before the 31 Jan 2027 deadline; Entra logs **Success**, HCP rejects the owner e-mail (an IBMid owner) | separate Entra test user, or a HashiCorp support case; IBMid stays as break-glass |
-| Google Workspace | SAML | — | 🔜 | requested | is there an existing Workspace for the domain, or a new trial? |
+| Google Workspace | — | — | ➖ | none exists: the domain's mail is Microsoft 365 (MX, SPF); a Google verification record serves Google Cloud | a new paid trial only if Google's office suite is wanted on top of M365 |
 | Assistant platform | SAML | — | 🔜 | requested | depends on the plan offering SSO |
 
 **Break-glass, one per app, never removed:** a password or IBMid login that does not depend on Entra, kept for
