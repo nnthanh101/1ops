@@ -26,6 +26,13 @@ Upstream library (git submodule, upstream/agent-toolkit-for-aws; never shipped, 
   agent-toolkit-for-aws    https://github.com/aws/agent-toolkit-for-aws          Apache-2.0
   Copyright Amazon.com, Inc. or its affiliates. A plugin copied from it keeps this licence and this NOTICE line.
 
+Upstream libraries approved by the maintainer on 2026-11-20 (git submodules under upstream/; never shipped, sources to copy from)
+  Shopify-AI-Toolkit       https://github.com/Shopify/Shopify-AI-Toolkit          MIT          plugins/shopify-plugin
+  vercel-plugin            https://github.com/vercel/vercel-plugin                Apache-2.0   plugins/vercel-plugin
+  Copyright Vercel, Inc.
+  agent-skills             https://github.com/hashicorp/agent-skills              MPL-2.0      plugins/terraform
+  Copyright HashiCorp. MPL-2.0 is file-level copyleft: a copied file stays under MPL-2.0 and its source stays available.
+
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT
 

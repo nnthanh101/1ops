@@ -8,3 +8,18 @@
 	url = https://github.com/aws/agent-toolkit-for-aws.git
 	branch = main
 	ignore = untracked
+[submodule "upstream/shopify-ai-toolkit"]
+	path = upstream/shopify-ai-toolkit
+	url = https://github.com/Shopify/Shopify-AI-Toolkit.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/vercel-plugin"]
+	path = upstream/vercel-plugin
+	url = https://github.com/vercel/vercel-plugin.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/hashicorp-agent-skills"]
+	path = upstream/hashicorp-agent-skills
+	url = https://github.com/hashicorp/agent-skills.git
+	branch = main
+	ignore = untracked
