@@ -10,16 +10,30 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
   Bump the digest when runbooks is rebuilt. Never a separate base image for 1xops.
 - Settings live in `.env.1xops` (non-secret `KEY=value`; secret-looking keys are refused). Guided setup: `1xops setup`.
 - Dependencies: latest stable, official only. A new third party needs the owner's yes and a line in `NOTICE`.
-- `plugins/` is the one catalogue people build from: our plugins as folders, library plugins as links into a pinned
-  `upstream/` submodule (`knowledge-work-plugins`, `agent-toolkit-for-aws`). `.claude-plugin/marketplace.json` decides
-  what ships: only a reviewed folder, never a link (CI refuses one). A new plugin is a copy of a library plugin into
-  its own folder, renamed into its namespace, with its licence and NOTICE line; every skill or server that can change
-  things is reviewed before it is listed. Guide: `plugins/README.md`.
+
+## The product: build your own plugin from proven free parts
+- Customers build a plugin from proven, free, open-source plugins of trusted vendors. They can only do that when every
+  part is in one visible place, so `plugins/` is the catalogue: a link to **every** plugin of each `upstream/<vendor>/`
+  submodule (pinned, never shipped: `knowledge-work-plugins`, `agent-toolkit-for-aws`; next Shopify, Vercel, Azure…),
+  beside the plugins we build. Never remove the links, never move the catalogue out of `plugins/`, never narrow it to
+  "only 1xops". A new vendor = a submodule in `upstream/` + one link per plugin (vendor prefix if names clash).
+- **1xops is the worked example**, one target built from the same catalogue a customer uses; building it proves the DIY
+  path end to end. Each customer builds their own 1xops-like plugin the same way, with the same parts and steps: copy a
+  library plugin once into its own folder, rename it into its namespace, keep its licence and NOTICE line, review
+  every skill or server that can change things. Tools: `cowork-plugin-management` now, `1xops plugin new` later.
+- **Shipping is controlled in one file.** Links in `plugins/` never ship; only entries in
+  `.claude-plugin/marketplace.json` do, and only reviewed folders (CI refuses a link).
+- **Free vs paid.** This open-source repository demonstrates how a one-off DIY plugin is built from trusted vendors'
+  free plugins (working names: 1ops & 1xops DIY plugins). Advanced capabilities and high-business-value template
+  plugins are built the same way and sold by oceansoft.io (enterprise edition), never added here.
+- Guide: `plugins/README.md`; decision: `docs/adr/0001-distribution.md`.
 
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
-- Git: work on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
+- Deliverables live in `~/Projects/1ops`, tracked by Git, on `develop`. A doc, rule, README or link the owner asks for is
+  written there directly and committed; never in a sibling folder. Only code that needs `task gate` uses a worktree.
+- Git: code works on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
   switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
   delete the branch and the worktree. The session commits and releases, but first asks the owner one question with
   scored options, each with its business value (version, now or hold); on yes it runs `task release STORY=n` end to end, then
@@ -95,3 +109,5 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | A release was bumped to 0.4.0 because a command was added; the owner wanted 0.3.2, and the tag had to be removed after the merge | A patch by default; the version is one of the scored options in the release question, asked before the release starts |
 | SSO tiles were reported as passing from clicks with a session already open; two of them (GitHub, Slack) were not SSO at all, and the tenant's status page, which already said so, was not read first | Read the tenant's status page first; a sign-in is ✅ only after a clean test (signed out, then launched); on a failure read the identity provider's sign-in log; report ✅ / 🔑 / 🛠️ / ⏳, without alarm |
 | A connector catalogue was called done while the README the owner named was not synced; a requested doc was hidden in a sibling worktree | Done means every named target is synced, with one status page per tenant and the rest linking to it; a requested doc goes in the owner's checkout. Give the full path and its git state |
+| The DIY rule and README were edited in `../1ops-diy-rule`, a sibling worktree, again after the same lesson | Requested docs, rules and links are written in `~/Projects/1ops` on `develop` and committed; a worktree is only for code that needs the gate |
+| "Customers see only 1xops" was read as "remove the catalogue": all 21 upstream links were deleted from `plugins/` (e68c14e) and had to be reverted | The product is DIY from one visible catalogue; 1xops is its worked example. Keep every link; `marketplace.json`, not the folder, decides what ships. When a request seems to narrow the model, ask before deleting |
