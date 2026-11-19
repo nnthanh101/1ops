@@ -56,6 +56,21 @@ Then, in your assistant, run `/1xops:check`. Free and included: `/1xops:tenant-s
 - **Nothing changes until you say yes.** Every configuration change is shown first and written only when you confirm.
 - **No secrets in files.** Sign-in stays with AWS SSO, `az login` and Atlassian's own sign-in.
 
+### Read-only checks in a container
+
+Sign in on your machine (`aws sso login`, `AZURE_CONFIG_DIR=~/.azure-reader az login`), then run the checks in the image, which carries the AWS CLI, the Azure CLI and `gh`. The container sees only your settings file, your AWS config and SSO sign-in (read-only), and the Azure Reader identity's own folder. It cannot reach your SSH keys, other sign-ins or any project's `.env`:
+
+```bash
+docker run --rm \
+  -v "$PWD/.env.1xops:/work/.env.1xops:ro" \
+  -v "${AWS_CONFIG_FILE:-$HOME/.aws/config}:/home/os/.aws/config:ro" -e AWS_CONFIG_FILE=/home/os/.aws/config \
+  -v "$HOME/.aws/sso:/home/os/.aws/sso:ro" \
+  -v "$HOME/.azure-reader:$HOME/.azure-reader" -e AZURE_CONFIG_DIR="$HOME/.azure-reader" \
+  nnthanh101/1xops doctor
+```
+
+The `isolation` row shows what the container can reach. It is **ready** when the AWS folder is read-only, the Azure folder is its own, and there are no SSH keys, no static AWS credentials and no `.env` files. Otherwise its fix names the mount to remove. When a sign-in ends, the fix says to sign in again on your machine; nothing in the container signs in or writes to your AWS folder. The Azure folder is mounted at the same path because a Reader service principal's certificate is stored by its full path. A token in the mounted sign-in can still be read inside the container, so the identity itself must be read-only.
+
 ## Free vs paid
 
 | | 1xops (this repository) | OceanSoft Cloud & AI Operations |

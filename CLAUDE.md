@@ -6,7 +6,7 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - One product, three native channels, the same commands and byte-identical output files:
   PyPI = native Python (`packages/python`), npm = native Node.js (`packages/npm`, no dependencies), Docker image.
   No channel may need another channel's runtime. Never ship a wrapper or launcher.
-- Docker image: `FROM nnthanh101/runbooks:prod`, pinned by digest, built from `uv.lock` (house style: adlc-framework/.devcontainer).
+- Docker image: `FROM nnthanh101/runbooks:<version>-cli` (AWS CLI, Azure CLI, gh), pinned by digest, built from `uv.lock` (house style: adlc-framework/.devcontainer).
   Bump the digest when runbooks is rebuilt. Never a separate base image for 1xops.
 - Settings live in `.env.1xops` (non-secret `KEY=value`; secret-looking keys are refused). Guided setup: `1xops setup`.
 - Dependencies: latest stable, official only. A new third party needs the owner's yes and a line in `NOTICE`.

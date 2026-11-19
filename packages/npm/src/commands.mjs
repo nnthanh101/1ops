@@ -2,7 +2,7 @@
 // package (packages/python/src/one_xops/cli.py and setup.py). Nothing changes unless --yes is given.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path, { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -104,11 +104,79 @@ function table(title, columns, rows) {
   console.log(rule('└', '┴', '┘', '─'));
 }
 
+// ── container ───────────────────────────────────────────────────────────────
+
+// In the 1xops image (it sets ONEXOPS_CONTAINER=1), sign-ins are made on the host and mounted in; nothing signs
+// in inside. A marker, not /.dockerenv: CI runners and other containers keep the behaviour of a person's machine.
+export const CONTAINER = process.env.ONEXOPS_CONTAINER === '1';
+const ON_HOST = CONTAINER ? ' on the host' : '';
+const HOST_ONLY = [s.HOST, 'uv', 'npx', 'docker']; // the person's own machine: in a container, shown only when there
+const ENV_FILE = /^\.env(\..+)?$/;
+const ENV_KEEP = /^\.env\.1xops$|\.(example|sample|template)$/;
+
+const tilde = (p) => {
+  const home = homedir();
+  return p === home || p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p;
+};
+
+// Mount point: its options, from the kernel's own list (/proc/self/mountinfo). Empty outside Linux.
+function mounts() {
+  let text;
+  try { text = readFileSync('/proc/self/mountinfo', 'utf8'); } catch { return {}; }
+  const out = {};
+  for (const line of text.split('\n')) {
+    const f = line.split(' ');
+    if (f.length > 5) out[f[4].replaceAll('\\040', ' ')] = f[5].split(',');
+  }
+  return out;
+}
+
+// `.env` files under root (names only, never read), `depth` folders down.
+function envFiles(root, depth) {
+  let entries;
+  try { entries = readdirSync(root, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)); } catch { return []; }
+  const found = [];
+  for (const e of entries) {
+    if (e.isFile() && ENV_FILE.test(e.name) && !ENV_KEEP.test(e.name)) found.push(join(root, e.name));
+    else if (depth && e.isDirectory() && !['.git', 'node_modules'].includes(e.name)) found.push(...envFiles(join(root, e.name), depth - 1));
+  }
+  return found;
+}
+
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
+const isDir = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
+
+// [status, detail] of what the container can reach besides the read-only sign-in.
+// Reads file names, environment names and mount options only; no file content.
+export function checkIsolation() {
+  const home = homedir();
+  const m = mounts();
+  const config = process.env.AWS_CONFIG_FILE || '';
+  const aws = Object.keys(m).filter((p) => p.startsWith(`${home}/.aws`) || (config && p === config));
+  const fixes = aws.filter((p) => !m[p].includes('ro')).map((p) => `${tilde(p)} is writable: mount it with :ro`);
+  const ssh = join(home, '.ssh');
+  if (isDir(ssh) && readdirSync(ssh).length) fixes.push('SSH keys in ~/.ssh: remove that mount');
+  if (process.env.SSH_AUTH_SOCK) fixes.push('an SSH agent is passed in: remove SSH_AUTH_SOCK and its socket mount');
+  for (const f of new Set([process.env.AWS_SHARED_CREDENTIALS_FILE, `${home}/.aws/credentials`].filter(Boolean))) {
+    if (isFile(f)) fixes.push(`static AWS credentials file ${tilde(f)}: remove that mount`);
+  }
+  if (process.env.AWS_ACCESS_KEY_ID) fixes.push('static AWS key in AWS_ACCESS_KEY_ID: remove that -e');
+  if (isDir(join(home, '.azure'))) fixes.push("default Azure login in ~/.azure: remove that mount, mount the Reader's own folder");
+  const envs = [...new Set([...envFiles(process.cwd(), 2), ...envFiles(home, 0)])];
+  if (envs.length) fixes.push(`host .env files (${envs.slice(0, 3).map(tilde).join(', ')}${envs.length > 3 ? ', …' : ''}): remove that mount`);
+  if (fixes.length) return ['check', fixes.join('; ')];
+  return ['ready', [
+    aws.length ? 'AWS folder read-only' : 'no AWS folder',
+    process.env.AZURE_CONFIG_DIR ? 'Azure folder its own' : 'no Azure folder',
+    'no SSH keys, no static AWS credentials, no host .env files',
+  ].join(', ')];
+}
+
 // ── doctor ──────────────────────────────────────────────────────────────────
 
 export function checkTools() {
   const tools = [['git', true], [s.HOST, true], ['uv', false], ['npx', false], ['docker', false], ['gh', false], ['aws', false], ['az', false]];
-  return tools.map(([name, required]) => {
+  return tools.filter(([name]) => !(CONTAINER && HOST_ONLY.includes(name) && !which(name))).map(([name, required]) => {
     const where = which(name);
     if (!where) return [name, required, false, 'not found on PATH'];
     const { code, out } = run(name, ['--version']);
@@ -130,7 +198,7 @@ export function checkEdition() {
   return ['edition', false, false, 'plugin not installed: 1xops install --yes'];
 }
 
-const READER_HINT = 'use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login';
+const READER_HINT = `use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login${ON_HOST}`;
 
 // Read-only sign-in checks. Account IDs are masked, never printed in full.
 export function checkSignIn(awsProfile) {
@@ -144,7 +212,7 @@ export function checkSignIn(awsProfile) {
       const access = accessFromRole(id.Arn);
       rows.push(['aws sign-in', false, true, `signed in, account ${mask(id.Account ?? '')}`]);
       rows.push(['aws access', false, access === 'read', ACCESS[access]]);
-    } else rows.push(['aws sign-in', false, false, 'not signed in (aws sso login)']);
+    } else rows.push(['aws sign-in', false, false, `not signed in (aws sso login${ON_HOST})`]);
   }
   if (which('az') && !process.env.AZURE_CONFIG_DIR) {
     // the default login is never read: it is a person's own, and it may change things
@@ -163,7 +231,8 @@ export function checkSignIn(awsProfile) {
 // (status, fix) for a failed AWS identity call, from the AWS CLI's own error text.
 export function awsFix(error, profile) {
   if (/could not be found/i.test(error)) return ['missing', `profile ${profile} not found: aws configure sso --profile ${profile}, or set AWS_CONFIG_FILE`];
-  if (/expired|refresh failed|sso.*token|nocredentials|unable to locate credentials/i.test(error)) return ['signed out', `aws sso login --profile ${profile}`];
+  if (/read-only file system.*\.aws\/cli/i.test(error)) return ['check', 'mount only the AWS config file and ~/.aws/sso, read-only (README docker run line)'];
+  if (/expired|refresh failed|sso.*token|nocredentials|unable to locate credentials|read-only file system/i.test(error)) return ['signed out', `aws sso login --profile ${profile}${ON_HOST}`];
   const first = error.split('\n').find((l) => l.trim()) ?? 'AWS identity call failed';
   return ['check', first.replace(/^aws: \[ERROR\]: /, '').slice(0, 120)];
 }
@@ -194,7 +263,7 @@ export function awsConnector(v, values) {
   if (longLivedKey(profile)) return [name, 'check', `${detail}; long-lived access key: use SSO, aws configure sso --profile ${profile}`];
   const end = SIGN_IN_ENDS ? ssoEnd(profile) : null;
   if (end && SIGN_IN_ENDS) {
-    SIGN_IN_ENDS[name] = [end, `aws sso login --profile ${profile}`];
+    SIGN_IN_ENDS[name] = [end, `aws sso login --profile ${profile}${ON_HOST}`];
     detail += `, signed in until ${utc(end)} UTC`;
   }
   return [name, access === 'read' ? 'ready' : 'check', detail];
@@ -240,7 +309,7 @@ export function longLivedKey(profile) {
 export function azureConnector(values = {}) {
   if (!which('az')) return ['azure', 'missing', 'install the Azure CLI'];
   const who = run('az', ['account', 'show', '--query', 'user.name', '--output', 'tsv']);
-  if (who.code !== 0 || !who.out) return ['azure', 'signed out', 'az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR'];
+  if (who.code !== 0 || !who.out) return ['azure', 'signed out', `az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR${ON_HOST}`];
   const wantTenant = values.AZURE_TENANT_ID || '';
   const wantSub = values.AZURE_SUBSCRIPTION_ID || '';
   // the subscription the server is given, by its ID: any one the identity can see, not only the CLI's default
@@ -282,8 +351,8 @@ export function checkConnectors(file, rows = []) {
   if (!existsSync(file)) { rows.push(['connectors', 'missing', `no ${file} here: run 1xops setup`]); return rows; }
   let cfg;
   try { cfg = cf.load(file); } catch (err) { rows.push(['connectors', 'missing', err.message]); return rows; }
-  for (const key of ['AWS_CONFIG_FILE', 'AZURE_CONFIG_DIR']) { // this tenant's own, never another tenant's from the shell
-    if (cfg.values[key]) process.env[key] = cfg.values[key].replace(/^~(?=$|\/)/, homedir());
+  for (const key of ['AWS_CONFIG_FILE', 'AZURE_CONFIG_DIR']) { // this tenant's own, never another tenant's from the shell; in a container, the mount's (docker run -e)
+    if (cfg.values[key] && !(CONTAINER && process.env[key])) process.env[key] = cfg.values[key].replace(/^~(?=$|\/)/, homedir());
   }
   if (!Object.keys(cfg.connectors).length) { rows.push(['connectors', 'missing', `ONEXOPS_CONNECTORS is empty in ${file}: run 1xops setup`]); return rows; }
   for (const connector of Object.keys(cfg.connectors)) {
@@ -417,12 +486,13 @@ export function doctor(opts, version) {
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
-  const all = [...checkTools(), checkEdition(), ...checkSignIn(opts['aws-profile'])];
+  const all = [...checkTools(), ...(CONTAINER && !which(s.HOST) ? [] : [checkEdition()]), ...checkSignIn(opts['aws-profile'])];
   const connectors = connectorRows(opts.file, []);
   const covered = coveredSignIns(connectors, opts['aws-profile']);
   const rows = all.filter((r) => !covered.has(r[0]));
   if (tty) process.stdout.write('\r\x1b[K');
   const shown = rows.map(([name, required, ok, detail]) => [name, required ? 'required' : 'optional', ok ? 'ok' : required ? 'missing' : 'check', scrub(detail)]);
+  if (CONTAINER) shown.push(['isolation', 'container', ...checkIsolation().map((x, i) => (i ? scrub(x) : x))]);
   shown.push(...connectors.map(([name, status, fix]) => [name, 'connector', status, scrub(fix)]));
   // Required tools and configured connectors that are not ok or ready. Optional tools stay in the table only.
   const todo = shown.filter((r) => r[2] !== 'ok' && r[2] !== 'ready' && r[2] !== 'in host' && r[1] !== 'optional');

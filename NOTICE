@@ -40,7 +40,7 @@ Connector servers named in the built-in profiles (fetched by the user at run tim
   @azure/mcp 3.0.0                                    https://github.com/microsoft/mcp MIT
   Atlassian remote server  https://mcp.atlassian.com/v2/mcp   hosted service, Atlassian's terms
 
-Container base image: nnthanh101/runbooks:prod (Wolfi), pinned by digest; built with uv from the Wolfi base; each package in it keeps
+Container base image: nnthanh101/runbooks cli (Wolfi; AWS CLI v2, Azure CLI, gh), pinned by digest; built with uv from the Wolfi base; each package in it keeps
 its own licence.
 
 Derived code (copied once; no upstream link is kept or tracked)
