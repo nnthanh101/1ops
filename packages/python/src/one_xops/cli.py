@@ -387,8 +387,21 @@ def _azure_connector(values: dict[str, str] | None = None) -> tuple[str, str, st
         values.get("AZURE_TENANT_ID", ""),
         values.get("AZURE_SUBSCRIPTION_ID", ""),
     )
+    # the subscription the server is given, by its ID: any one the identity can see, not only the CLI's default
+    pick = ["--subscription", want_sub] if want_sub else []
     if want_tenant or want_sub:
-        code, ids = _run(["az", "account", "show", "--query", "[tenantId,id]", "--output", "tsv"])
+        code, ids = _run(
+            ["az", "account", "show", *pick, "--query", "[tenantId,id]", "--output", "tsv"]
+        )
+        if want_sub and code != 0:
+            return (
+                "azure",
+                "wrong account",
+                (
+                    f"this identity cannot see subscription {_mask(want_sub)}: sign in with one that can, "
+                    "AZURE_CONFIG_DIR=~/.azure-reader az login"
+                ),
+            )
         tenant, _, sub = ids.partition("\t") if code == 0 else ("", "", "")
         if want_tenant and tenant and tenant != want_tenant:
             return (
@@ -417,6 +430,7 @@ def _azure_connector(values: dict[str, str] | None = None) -> tuple[str, str, st
             "--assignee",
             out,
             "--all",
+            *pick,
             "--query",
             "[].roleDefinitionName",
             "--output",
