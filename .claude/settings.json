@@ -136,9 +136,18 @@
     "product-management@knowledge-work-plugins": true,
     "sales@knowledge-work-plugins": true,
     "small-business@knowledge-work-plugins": true,
+    "aws-core@agent-toolkit-for-aws": true,
+    "aws-agents@agent-toolkit-for-aws": true,
+    "aws-data-analytics@agent-toolkit-for-aws": true,
+    "aws-agents-for-devsecops@agent-toolkit-for-aws": true,
+    "aws-startup-advisor@agent-toolkit-for-aws": true,
+    "aws-continuum@agent-toolkit-for-aws": true,
     "shopify-plugin@shopify-ai-toolkit": true,
     "vercel-plugin@vercel": true,
     "terraform@hashicorp": true,
-    "superpowers@superpowers-dev": true
+    "superpowers@superpowers-dev": true,
+    "design@knowledge-work-plugins": true,
+    "legal@knowledge-work-plugins": true,
+    "productivity@knowledge-work-plugins": true
   }
 }
