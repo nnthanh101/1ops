@@ -34,7 +34,9 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
 - Deliverables live in `~/Projects/1xops`, tracked by Git, on `develop`. A doc, rule, README or link the owner asks for is
   written there directly and committed; never in a sibling folder. Only code that needs `task gate` uses a worktree.
-- Git: code works on `feature/*` in its own worktree (`git worktree add ../1xops-<slug> -b feature/<slug>`), never by
+- End state first: before changing files or folders, say in one line what will exist when done (`~/Projects` holds one
+  folder per repo: `1xops`, `1xops-enterprise`, `command-center`); at the end run `ls ~/Projects` and show it matches.
+- Git: code works on `feature/*` in its own worktree inside the repo (`git worktree add .claude/worktrees/<slug> -b feature/<slug>`, git-ignored; never a new folder in `~/Projects`), never by
   switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
   delete the branch and the worktree. The session commits and releases, but first asks the owner one question with
   scored options, each with its business value (version, now or hold); on yes it runs `task release STORY=n` end to end, then
@@ -113,3 +115,6 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | The catalogue was changed without the owner: 5 partner-built plugins, bio-research and pdf-viewer were linked though never picked (all removed) | The owner selects the catalogue; a session proposes a link change and makes it only on a yes, and removes only what was named |
 | The DIY rule and README were edited in `../1ops-diy-rule`, a sibling worktree, again after the same lesson | Requested docs, rules and links are written in `~/Projects/1xops` on `develop` and committed; a worktree is only for code that needs the gate |
 | "Customers see only 1xops" was read as "remove the catalogue": all 21 upstream links were deleted from `plugins/` (e68c14e) and had to be reverted | The product is DIY from one visible catalogue; 1xops is its worked example. Keep every link; `marketplace.json`, not the folder, decides what ships. When a request seems to narrow the model, ask before deleting |
+| A folder cleanup created a new sibling worktree (`~/Projects/1xops-enterprise-cc`) without saying so | Worktrees live in `.claude/worktrees/<slug>` inside the repo; say before creating one and remove it in the same session; check `ls ~/Projects` against the end state |
+| `mv` commands handed to the owner reused a folder name; running one again sent the real `command-center` repo to the Trash | A command handed to the owner checks what it acts on (`git remote get-url origin`) before moving it, so running it twice does nothing; never reuse a name in the same set |
+| A one-line reply was taken as approval to fold a public Apache-2.0 npm product into the private enterprise repo | A change that crosses public/private, licence or publishing lines gets one question with its costs, and waits for the answer; small reversible steps are just done |
