@@ -243,13 +243,16 @@ export function azureConnector(values = {}) {
   if (who.code !== 0 || !who.out) return ['azure', 'signed out', 'az login with a read-only (Reader) identity, in its own AZURE_CONFIG_DIR'];
   const wantTenant = values.AZURE_TENANT_ID || '';
   const wantSub = values.AZURE_SUBSCRIPTION_ID || '';
+  // the subscription the server is given, by its ID: any one the identity can see, not only the CLI's default
+  const pick = wantSub ? ['--subscription', wantSub] : [];
   if (wantTenant || wantSub) {
-    const ids = run('az', ['account', 'show', '--query', '[tenantId,id]', '--output', 'tsv']);
+    const ids = run('az', ['account', 'show', ...pick, '--query', '[tenantId,id]', '--output', 'tsv']);
+    if (wantSub && ids.code !== 0) return ['azure', 'wrong account', `this identity cannot see subscription ${mask(wantSub)}: sign in with one that can, AZURE_CONFIG_DIR=~/.azure-reader az login`];
     const [tenant = '', sub = ''] = ids.code === 0 ? ids.out.split('\t') : [];
     if (wantTenant && tenant && tenant !== wantTenant) return ['azure', 'wrong account', `tenant is ${mask(tenant)}, this tenant expects ${mask(wantTenant)}: az login --tenant <AZURE_TENANT_ID>`];
     if (wantSub && sub && sub !== wantSub) return ['azure', 'wrong account', `subscription is ${mask(sub)}, this tenant expects ${mask(wantSub)}: az account set --subscription <AZURE_SUBSCRIPTION_ID>`];
   }
-  const roles = run('az', ['role', 'assignment', 'list', '--assignee', who.out, '--all', '--query', '[].roleDefinitionName', '--output', 'json'], 60000);
+  const roles = run('az', ['role', 'assignment', 'list', '--assignee', who.out, '--all', ...pick, '--query', '[].roleDefinitionName', '--output', 'json'], 60000);
   let names = [];
   try { names = roles.code === 0 ? JSON.parse(roles.out) : []; } catch { /* not JSON */ }
   const access = azureAccess(names);
