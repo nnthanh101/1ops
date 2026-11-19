@@ -22,6 +22,10 @@ Upstream (git submodule, upstream/knowledge-work-plugins; plugins/operations lin
   operations, cowork-plugin-management, customer-support, data, engineering, enterprise-search, finance,
   human-resources, marketing, product-management, sales, small-business.
 
+Upstream library (git submodule, upstream/agent-toolkit-for-aws; never shipped, a source to copy from)
+  agent-toolkit-for-aws    https://github.com/aws/agent-toolkit-for-aws          Apache-2.0
+  Copyright Amazon.com, Inc. or its affiliates. A plugin copied from it keeps this licence and this NOTICE line.
+
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT
 

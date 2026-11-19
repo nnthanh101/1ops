@@ -3,3 +3,8 @@
 	url = https://github.com/anthropics/knowledge-work-plugins.git
 	branch = main
 	ignore = untracked
+[submodule "upstream/agent-toolkit-for-aws"]
+	path = upstream/agent-toolkit-for-aws
+	url = https://github.com/aws/agent-toolkit-for-aws.git
+	branch = main
+	ignore = untracked
