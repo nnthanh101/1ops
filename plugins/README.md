@@ -14,6 +14,8 @@ This folder is the catalogue. It holds a link to each selected free, open-source
 
 **Review before it ships.** A library plugin can carry servers or steps that change things. For example, the AWS library's `aws-core`, `aws-data-analytics` and `aws-startup-advisor` use a server that can call any AWS API, so a read-only role is what keeps them read-only. Check every skill and server of your copy, and run `1xops doctor`, before you list it.
 
+**Approved means on for the whole team.** Every link here is turned on for every member by the shared settings file (`.claude/settings.json`, one marketplace per vendor), so a clean clone gets the whole catalogue with no personal setup. A link added here is enabled there in the same commit. Versions follow each vendor's main branch; `upstream/` keeps the reviewed commit. A plugin that can change things acts only with the member's read-only sign-in (`1xops doctor` first).
+
 **What ships is decided in one file.** Links here never ship; only entries in `marketplace.json` do, and only folders (the release check refuses a link).
 
 **Library updates.** A library changes only when its pin in `upstream/` moves; the links follow that pin. Your copies never change by themselves.
