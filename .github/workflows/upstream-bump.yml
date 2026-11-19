@@ -1,6 +1,7 @@
 name: Upstream bump
 
-# Monthly: move the knowledge-work-plugins pin to upstream main and open a PR to develop.
+# Monthly: move every pin under upstream/ (one submodule per vendor: knowledge-work-plugins, agent-toolkit-for-aws,
+# and any vendor added later, found in .gitmodules) to its branch and open one PR to develop.
 # Locally: act workflow_dispatch -W .github/workflows/upstream-bump.yml --secret-file .secrets
 on:
   schedule:
@@ -25,38 +26,38 @@ jobs:
         with:
           ref: develop
           submodules: true
-      - name: Update the pin and open a PR
+      - name: Move every pin, check, and open one PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          old=$(git -C upstream/knowledge-work-plugins rev-parse --short HEAD)
-          git submodule update --remote upstream/knowledge-work-plugins
-          new=$(git -C upstream/knowledge-work-plugins rev-parse --short HEAD)
-          if [ "$old" = "$new" ]; then echo "Already at upstream $new"; exit 0; fi
+          moved="" notes=""
+          for path in $(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '$2 ~ /^upstream\// {print $2}'); do
+            old=$(git -C "$path" rev-parse --short HEAD)
+            git submodule update --remote "$path"
+            new=$(git -C "$path" rev-parse --short HEAD)
+            [ "$old" = "$new" ] && { echo "$path already at $new"; continue; }
+            name=${path#upstream/}
+            moved="$moved ${name} ${old}→${new};"
+            url=$(git config -f .gitmodules --get "submodule.$path.url" | sed 's/\.git$//')
+            # The plugins 1xops depends on from this vendor: the changes a reviewer must read first
+            market=$(jq -r .name "$path/.claude-plugin/marketplace.json" 2>/dev/null)
+            deps=$(jq -r --arg m "$market" '.dependencies[]? | strings | select(endswith("@" + $m)) | sub("@.*"; "")' \
+              plugins/*/.claude-plugin/plugin.json | sort -u)
+            srcs=$(for d in $deps; do jq -r --arg n "$d" '.plugins[] | select(.name == $n) | .source | strings' \
+              "$path/.claude-plugin/marketplace.json" | sed 's#^\./##'; done)
+            # shellcheck disable=SC2086 # one path argument per plugin folder
+            log=$( [ -n "$srcs" ] && git -C "$path" log --oneline "$old..$new" -- $srcs | head -50 )
+            notes="$notes"$'\n\n'"### ${name} ${old} → ${new}"$'\n'"All changes: $url/compare/$old...$new"
+            notes="$notes"$'\n'"Changes in the plugins 1xops depends on (${deps:+$(printf '%s' "$deps" | tr '\n' ',')}): "$'\n'"${log:-none}"
+          done
+          [ -z "$moved" ] && { echo "Every pin is already at its upstream branch"; exit 0; }
           branch="feature/upstream-bump-$(date -u +%Y-%m)"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             echo "$branch already exists; merge or close that PR first"; exit 0
           fi
-          # The upstream plugins 1xops depends on, read from plugin.json so the list is never kept twice
-          deps=$(jq -r '.dependencies[] | select(endswith("@knowledge-work-plugins")) | sub("@.*"; "")' \
-            plugins/1xops/.claude-plugin/plugin.json)
-          # Every one of them must still be there, or 1xops would fail to install for the customer
-          for d in $deps; do
-            test -f "upstream/knowledge-work-plugins/$d/.claude-plugin/plugin.json" \
-              || { echo "upstream moved or removed $d/"; exit 1; }
-          done
-          test -d upstream/knowledge-work-plugins/operations/skills || { echo "upstream moved operations/skills/"; exit 1; }
-          for p in plugins/*/; do
-            test -f "$p.claude-plugin/plugin.json" || { echo "$p no longer resolves in upstream"; exit 1; }
-          done
-          # The upstream plugins linked under plugins/ (the folders this repo serves and validates)
-          linked=$(for p in plugins/*/; do [ -L "${p%/}" ] && basename "$p"; done)
-          # shellcheck disable=SC2086 # one path argument per plugin folder
-          all=$(git -C upstream/knowledge-work-plugins log --oneline "$old..$new" -- $deps $linked)
-          ops=$(echo "$all" | head -100)
-          [ "$(echo "$all" | wc -l)" -gt 100 ] && ops="$ops"$'\n'"…and more: see the compare link above."
-          # A pull request opened with GITHUB_TOKEN starts no workflow, so the plugin checks of the Release
-          # workflow (the only ones the pin can change) run here, before the PR exists.
+          # Every dependency of 1xops still resolves at the new pins, or no PR (the pins stay where they were)
+          bash scripts/upstream-check.sh
+          # A PR opened with GITHUB_TOKEN starts no workflow, so the Release workflow's plugin checks run here.
           npm install --no-save --prefix "$RUNNER_TEMP/v" @anthropic-ai/claude-code@2.1.325
           node "$RUNNER_TEMP/v/node_modules/@anthropic-ai/claude-code/install.cjs"
           "$RUNNER_TEMP/v/node_modules/.bin/claude" plugin validate --strict .
@@ -64,9 +65,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git commit -am "chore: knowledge-work-plugins $old → $new"
+          git commit -am "chore: upstream pins:$moved"
           git push -u origin "$branch"
-          body="Monthly upstream pin bump. All upstream changes: https://github.com/anthropics/knowledge-work-plugins/compare/$old...$new"
-          body="$body"$'\n\n'"Plugin validation passed in the bump job (strict, pinned validator). Run task gate locally before merging."
-          body="$body"$'\n\n'"Changes in the plugins 1xops depends on or links ($(echo $deps $linked | tr ' ' '\n' | sort -u | paste -sd, -)):"$'\n\n'"${ops:-none}"
-          gh pr create --base develop --title "chore: knowledge-work-plugins $old → $new" --body "$body"
+          body="Monthly upstream pin bump:$moved"$'\n\n'"upstream-check and strict plugin validation passed in the bump job. Run task gate locally before merging, then update upstream/README.md if a pick changes.$notes"
+          gh pr create --base develop --title "chore: upstream pins:$moved" --body "$body"
