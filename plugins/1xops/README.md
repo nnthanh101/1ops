@@ -69,6 +69,10 @@ Defined in [`.mcp.json`](.mcp.json): GitHub, Azure DevOps, Atlassian, Notion and
 
 `plugin.json` declares 12 free plugins from Anthropic's `knowledge-work-plugins` marketplace as dependencies, installed with 1xops: `operations` (the base the 1xops skills build on), `cowork-plugin-management`, `customer-support`, `data`, `engineering`, `enterprise-search`, `finance`, `human-resources`, `marketing`, `product-management`, `sales` and `small-business`. Together they bring about 60 connectors; the session start checks only those of 1xops and `operations`, so a connector you do not use never fills the screen (`ONEXOPS_IGNORE` leaves out more). 1xops commands are namespaced `/1xops:*` and never replace the base plugin's commands. Five 1xops skills share a name with an `operations` skill (`change-request`, `capacity-plan`, `compliance-tracking`, `process-doc`, `vendor-review`): the `operations:*` one is the generic version, and the `/1xops:*` one adds the active tenant's approvers, freeze window and filing targets, and asks before anything is filed.
 
+## Skills for building your own plugin
+
+Beside the dependencies above, a clone of this repository turns on `document-skills` (`document-skills:docx`, `:pdf`, `:pptx`, `:xlsx`) for every member, so a plugin you build can produce real Word, PDF, PowerPoint and Excel files, and `skill-creator` to write the skills. `commerce-builder` is there as a reference for building agents whose writes are staged and approved by a person. They are not part of this plugin and are not copied into it. See [`plugins/README.md`](../README.md).
+
 ## Licence
 
 Apache-2.0. See [LICENSE](../../LICENSE) and [NOTICE](../../NOTICE). © 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io.

@@ -37,6 +37,14 @@ Upstream libraries approved by the maintainer on 2026-11-20 (git submodules unde
   claude-plugins-official  https://github.com/anthropics/claude-plugins-official Apache-2.0   12 Anthropic-built plugins linked in plugins/
   (claude-code-setup, code-review, pr-review-toolkit, security-guidance, claude-security, feature-dev, code-simplifier,
   claude-md-management, plugin-dev, skill-creator, hookify, frontend-design); partner plugins in it are not linked.
+  skills                   https://github.com/anthropics/skills                   Apache-2.0   upstream/anthropic-skills; enabled through its marketplace, no link in plugins/ (a skill is not a plugin folder)
+  Approved now: document-skills (docx, pdf, pptx, xlsx), each with its own Apache-2.0 LICENSE.txt. A skill copied from it keeps
+  that licence and this NOTICE line. Reviewed 2026-11-20: their scripts make no network or cloud call; they may run pip or npm
+  install for a missing package. The repository's THIRD_PARTY_NOTICES lists FFmpeg (GPL-3.0) for slack-gif-creator only, which is
+  not enabled; do not copy that skill without the owner's yes.
+  commerce-agents          https://github.com/anthropics/commerce-agents         Apache-2.0   plugins/commerce-builder (v0.1.0)
+  A plugin copied from it keeps this licence and NOTICE line. Reviewed 2026-11-20: no MCP server, hook or connector, no cloud
+  call; its commands may clone the reference repository, write project files and run pip or npm installs for the scaffold, after a person's yes. Its sample data is fictional.
 
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT

@@ -4,7 +4,7 @@ This folder is the catalogue. It holds a link to each selected free, open-source
 
 | Kind | In this folder as | Ships to customers |
 |---|---|---|
-| **Library** | a link into `upstream/<vendor>/` (`knowledge-work-plugins`, `agent-toolkit-for-aws`, `shopify-ai-toolkit`, `vercel-plugin`, `hashicorp-agent-skills`, `superpowers`, `claude-plugins-official`; more vendors to come), each pinned | never: a part to build from |
+| **Library** | a link into `upstream/<vendor>/` (`knowledge-work-plugins`, `agent-toolkit-for-aws`, `shopify-ai-toolkit`, `vercel-plugin`, `hashicorp-agent-skills`, `superpowers`, `claude-plugins-official`, `anthropic-skills`, `commerce-agents`; more vendors to come), each pinned | never: a part to build from |
 | **Worked example** | a folder: `1xops` | yes: it is listed in [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) |
 | **Your own** | a folder you built from the library, under your own name | only after review, once you list it in your `marketplace.json` |
 
@@ -17,6 +17,8 @@ This folder is the catalogue. It holds a link to each selected free, open-source
 **Approved means on for the whole team.** Every link here is turned on for every member by the shared settings file (`.claude/settings.json`, one marketplace per vendor), so a clean clone gets the whole catalogue with no personal setup. A link added here is enabled there in the same commit. Versions follow each vendor's main branch; `upstream/` keeps the reviewed commit. A plugin that can change things acts only with the member's read-only sign-in (`1xops doctor` first).
 
 **What ships is decided in one file.** Links here never ship; only entries in `marketplace.json` do, and only folders (the release check refuses a link).
+
+**Skill libraries.** `upstream/anthropic-skills` holds skills, not plugin folders, so it has no link here (the release check needs a `plugin.json` in every folder of `plugins/`). It is enabled through its marketplace instead. On now: `document-skills` (docx, pdf, pptx, xlsx), so the skills you build can hand over real Word, PDF, PowerPoint and Excel files; call them as `document-skills:docx`. `skill-creator` and `frontend-design` are already on from the official plugins. Approved but not on yet: `mcp-builder`, `internal-comms`, `web-artifacts-builder`, `webapp-testing`; they come only in a bundle with skills nobody selected.
 
 **Library updates.** A library changes only when its pin in `upstream/` moves; the links follow that pin. Your copies never change by themselves.
 

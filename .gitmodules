@@ -33,3 +33,13 @@
 	url = https://github.com/anthropics/claude-plugins-official.git
 	branch = main
 	ignore = untracked
+[submodule "upstream/anthropic-skills"]
+	path = upstream/anthropic-skills
+	url = https://github.com/anthropics/skills.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/commerce-agents"]
+	path = upstream/commerce-agents
+	url = https://github.com/anthropics/commerce-agents.git
+	branch = main
+	ignore = untracked
