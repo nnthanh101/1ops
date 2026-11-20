@@ -95,6 +95,8 @@ Use `~~category` placeholders only if the person says the plugin will be shared 
      - every referenced file exists
    - Fix every error before going on.
 3. Run `claude plugin eval <plugin>` when it is available, otherwise run the job once on each case in `evals/`, with synthetic or redacted data. Show the result next to the expected one, with every difference. The reviewer named in the spec accepts or rejects it. Record the answer in the spec's step 6.
+   - A plugin with `dependencies` loads nothing from its folder when a dependency is not installed, and says nothing. Before the eval, check that its commands are listed (`claude -p --plugin-dir <plugin> "list the /<name>: commands"`). If none are listed, run the eval on a copy without `dependencies` in a temporary folder, and say which cases need a dependency.
+   - Read the eval's delta over the no-plugin run. A delta of 0 means the plugin did not change the answer, so the result proves nothing about it.
 4. Deliver for the place you are running in (table above). Zip to a temporary folder first, then copy:
 
    ```bash

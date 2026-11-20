@@ -89,6 +89,8 @@ Use the words the teams already use in their documents. A name never carries the
   - Write `workflows/<job-slug>/spec.md` from `references/workflow-spec.md`.
   - Write `workflows/<job-slug>/plugin.xlsx` from `references/plugin-template.xlsx`: copy the template, then fill each role's own sheet from the answers (Job, Business rules, Integrations, Access, Proof, Next).
     - Delete the example rows, and leave an unanswered field empty with its role under Next → Open question.
+    - Each sheet holds one Excel table. After you add rows, extend that table's range to the last filled row and keep its columns as they are, so Excel opens the file without a repair prompt.
+    - Write a `_sync` row (sheet, ID or field, fingerprint) for every fact you fill, not only the thresholds, so `/1xops:overview` sees any later edit.
     - Use the `xlsx` skill if it is available. Otherwise use Python with openpyxl.
     - If neither is available, write the spec only and say that the workbook needs the `xlsx` skill.
   - The workbook is where each role edits its own decisions; `/1xops:overview` keeps it and the plugin in sync.

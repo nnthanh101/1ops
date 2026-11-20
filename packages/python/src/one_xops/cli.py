@@ -310,7 +310,7 @@ def _edition_row(edition: str, plugin: str) -> tuple[str, bool, bool, str]:
             "edition",
             False,
             False,
-            f"{found}; this 1xops command is {__version__}: uv tool upgrade 1xops (or npm install -g 1xops)",
+            f"{found}; this 1xops command is {__version__}: uv tool install 1xops@latest (or npm install -g 1xops@latest)",
         )
     if _semver(plugin) < _semver(__version__):
         return (

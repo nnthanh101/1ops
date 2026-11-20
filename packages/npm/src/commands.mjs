@@ -205,7 +205,7 @@ const compare = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i+
 function editionRow(edition, plugin, cli) {
   const found = `${edition} ${plugin}`.trim();
   const order = plugin && cli ? compare(semver(plugin), semver(cli)) : 0;
-  if (order > 0) return ['edition', false, false, `${found}; this 1xops command is ${cli}: uv tool upgrade 1xops (or npm install -g 1xops)`];
+  if (order > 0) return ['edition', false, false, `${found}; this 1xops command is ${cli}: uv tool install 1xops@latest (or npm install -g 1xops@latest)`];
   if (order < 0) return ['edition', false, false, `${found}; this 1xops command is ${cli}: run /plugin update 1xops in the assistant`];
   return ['edition', false, true, found];
 }
