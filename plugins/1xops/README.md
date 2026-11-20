@@ -1,10 +1,11 @@
 # 1xops plugin
 
-1xops by [OceanSoft.io](https://www.oceansoft.io): cloud and AI cost checks, change requests and runbooks on real assets.
+1xops by [OceanSoft.io](https://www.oceansoft.io) is a trusted advisor for building your own plugin. You show it a job your team already does; it builds the plugin from approved, tested parts, so your team spends its time on the business result, not on choosing and wiring tools.
 
-- Every figure carries its source.
-- Read-only by default.
-- Nothing is written, filed or changed without a person's yes.
+- It starts from evidence: "show me the last time you did this job".
+- It uses only parts this project approved: catalogue plugins, settings templates and connectors.
+- A copy keeps its licence and origin, and lists every step that can change things.
+- Nothing ships until it is reviewed and listed in `marketplace.json`.
 
 ## Install
 
@@ -20,21 +21,22 @@ One namespace for free and enterprise: every command and skill is `/1xops:<name>
 | Command | What it does | Edition |
 |---|---|---|
 | `/1xops:check` | Each connector as ready, signed out or missing, with the exact fix; runs `1xops doctor` | Free (this repository) |
-| `/1xops:tenant-setup` (skill) | Create, list, show or switch the active tenant; one non-secret settings file per tenant | Free |
-| `/1xops:change-request` (skill) | A change request with impact, risk and rollback for your change board, from a description or `terraform show -json`; filed only after a yes | Free |
-| `/1xops:vendor-review` (skill) | Total cost, risk and contract status of a vendor, with one recommendation; every figure sourced | Free |
-| `/1xops:process-doc` (skill) | A process document (SOP, workflow, RACI) saved to your knowledge base after a yes | Free |
-| `/1xops:capacity-plan` (skill) | Load, growth, headroom and when a limit is reached, from real utilisation | Free |
-| `/1xops:compliance-tracking` (skill) | Controls and evidence: status, gaps, owners and due dates | Free |
+| `/1xops:discover` (skill) | Turns a job you already do into a workflow spec: owner, trigger, useful result, data, permission per operation, how the first run is proved and improved | Free |
+| `/1xops:new-plugin` (skill) | Builds a plugin from that spec, reusing an approved catalogue plugin first; the spec's examples become its first test | Free |
+| `/1xops:customize-plugin` (skill) | Copies a catalogue plugin into your own folder and name with its licence and origin, and lists what can change things; or adapts a plugin you own to your tools | Free |
+| `/1xops:recommend-setup` (skill) | Recommends settings, plugins and connectors only from what the project approved, each marked tested, approved or not approved; changes nothing | Free |
+| `/1xops:improve-instructions` (skill) | Scores the project's instructions and proposes short fixes, applied after a yes | Free |
+| `/1xops:capture-learnings` (skill) | Turns what a session learned into one-line instruction updates, applied after a yes | Free |
+| `/1xops:tenant-setup`, `change-request`, `vendor-review`, `process-doc`, `capacity-plan`, `compliance-tracking` (skills) | Operations playbooks per tenant, built with the free builder | Enterprise |
 | `/1xops:cost-check` | Top AWS and Azure savings, each with \$/month and its source | Enterprise |
 | `/1xops:ai-spend` | AI spend by team, vendor, and seat vs API | Enterprise |
 | `/1xops:runbook` | A runbook with a person's yes at each step, and evidence | Enterprise |
 | `/1xops:status` | The weekly status, from a live project board | Enterprise |
 | `/1xops:read-only-cloud` (skill) | Keeps AWS and Azure work read-only: checks access first, proposes any change | Enterprise |
 
-### Tenants
+### Where the skills run
 
-The skills work per tenant: a company, a team or a customer you operate for. Each tenant is one file of non-secret settings, `tenants/<name>/tenant.env` (names, approvers, where documents and changes go, which clouds). The active tenant is the one name in `tenants/.active`. `/1xops:tenant-setup new <name>` asks for each value; nothing secret is stored, and sign-ins stay with each connector.
+Every builder skill works in a project folder (terminal, editor, desktop code tab), in the desktop workspace (it hands over a `.plugin` file), in chat (it returns the files) and in a run with nobody to answer (it takes answers from a brief and lists what is missing). Only the project folder is tested today; the other places are marked as needing a test until a run proves them.
 
 ### Session start
 
@@ -54,12 +56,12 @@ It looks at the tenant's connectors in `.env.1xops`, the servers of this plugin 
 | Rule | Example |
 |---|---|
 | Every command and skill is `/1xops:<name>` | `/1xops:check` |
-| `<name>` is the outcome the user gets: lowercase kebab-case, 1–2 words | `cost-check`, `change-request` |
+| `<name>` is the outcome the user gets: lowercase kebab-case, 1–2 words | `new-plugin`, `cost-check` |
 | No edition, vendor or version in the name | not `/1xops:pro-cost`, not `/1xops:aws-cost-v2` |
 | A skill is named for the rule it enforces | `/1xops:read-only-cloud` |
 | A shipped name never changes meaning | `check` is the same command in both editions |
 
-Free: marketplace `1ops` (this repository), `1xops install --yes` or `/plugin install 1xops@1ops`. Enterprise: marketplace `1xops` (private `1xOps/1xops-enterprise`), bought at [shop.oceansoft.io](https://shop.oceansoft.io) and installed with `1xops install --edition enterprise --file <bundle> --yes`: the same `1xops` plugin with every command above. Installing one edition replaces the other.
+Free: marketplace `1ops` (this repository), `1xops install --yes` or `/plugin install 1xops@1ops`. Enterprise: marketplace `1xops` (private `1xOps/1xops-enterprise`), bought at [shop.oceansoft.io](https://shop.oceansoft.io) and installed with `1xops install --edition enterprise --file <bundle> --yes`: the same `1xops` plugin with every command above, the builder included. Installing one edition replaces the other.
 
 ## Connectors
 
@@ -69,7 +71,9 @@ Azure DevOps needs your organisation: set `AZURE_DEVOPS_ORG` in your environment
 
 ## Dependency
 
-`plugin.json` declares 12 free plugins from Anthropic's `knowledge-work-plugins` marketplace as dependencies, installed with 1xops: `operations` (the base the 1xops skills build on), `cowork-plugin-management`, `customer-support`, `data`, `engineering`, `enterprise-search`, `finance`, `human-resources`, `marketing`, `product-management`, `sales` and `small-business`. Together they bring about 60 connectors; the session start checks only those of 1xops and `operations`, so a connector you do not use never fills the screen (`ONEXOPS_IGNORE` leaves out more). 1xops commands are namespaced `/1xops:*` and never replace the base plugin's commands. Five 1xops skills share a name with an `operations` skill (`change-request`, `capacity-plan`, `compliance-tracking`, `process-doc`, `vendor-review`): the `operations:*` one is the generic version, and the `/1xops:*` one adds the active tenant's approvers, freeze window and filing targets, and asks before anything is filed.
+`plugin.json` declares 12 free plugins from the `knowledge-work-plugins` marketplace as dependencies, installed with 1xops: `operations`, `cowork-plugin-management`, `customer-support`, `data`, `engineering`, `enterprise-search`, `finance`, `human-resources`, `marketing`, `product-management`, `sales` and `small-business`. They are the parts a plugin is built from. The session start checks only the connectors of 1xops and `operations`, so a connector you do not use never fills the screen (`ONEXOPS_IGNORE` leaves out more). 1xops commands are namespaced `/1xops:*` and never replace a library plugin's commands. Each builder skill names the generic version it improves on (for example `cowork-plugin-management:cowork-plugin-customizer`); the generic `operations:*` playbooks stay available to free users.
+
+Five builder skills are copied from library plugins and changed for 1xops. Each skill folder keeps its licence and an `UPSTREAM.md` with its origin, pinned commit and what changed.
 
 ## Skills for building your own plugin
 

@@ -5,13 +5,13 @@
     "email": "nnthanh101@gmail.com"
   },
   "metadata": {
-    "description": "1xops free edition by OceanSoft.io: /1xops:check and the tenant, change-request, vendor-review, process-doc, capacity-plan and compliance-tracking skills. Free, open source (Apache-2.0). Enterprise: marketplace 1xops."
+    "description": "1xops free edition by OceanSoft.io: /1xops:check and the plugin builder (discover, new-plugin, customize-plugin, recommend-setup, improve-instructions, capture-learnings). Free, open source (Apache-2.0). Enterprise: marketplace 1xops."
   },
   "plugins": [
     {
       "name": "1xops",
       "source": "./plugins/1xops",
-      "description": "Cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced; nothing changed without a yes."
+      "description": "Build your own plugin from approved, tested parts, starting from a job your team already does. Licence and origin kept; nothing ships unreviewed."
     }
   ],
   "allowCrossMarketplaceDependenciesOn": [

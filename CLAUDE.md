@@ -21,7 +21,13 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - **1xops is the worked example**, one target built from the same catalogue a customer uses; building it proves the DIY
   path end to end. Each customer builds their own 1xops-like plugin the same way, with the same parts and steps: copy a
   library plugin once into its own folder, rename it into its namespace, keep its licence and NOTICE line, review
-  every skill or server that can change things. Tools: `cowork-plugin-management` now, `1xops plugin new` later.
+  every skill or server that can change things. Tools: the free plugin itself is the builder (`/1xops:discover`,
+  `new-plugin`, `customize-plugin` with `scripts/fork.sh`); `1xops plugin new` on the command line later.
+- **Free 1xops is the DIY builder and trusted advisor; operations playbooks are paid.** It recommends only approved,
+  tested settings, plugins and official components so the customer focuses on business value. OceanSoft is its first
+  customer: the enterprise plugin (`1xops-enterprise/plugins/1xops`) is built with it, from proven free plugins plus
+  repeatable workflows, judged on buyer urgency and measurable value, differentiation, fit and feasibility,
+  willingness to pay and recurring value, and expansion.
 - **Shipping is controlled in one file.** Links in `plugins/` never ship; only entries in
   `.claude-plugin/marketplace.json` do, and only reviewed folders (CI refuses a link).
 - **Free vs paid.** This open-source repository demonstrates how a one-off DIY plugin is built from trusted vendors'
@@ -47,8 +53,10 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 
 ## Commands: one namespace
 Every command and skill is `/1xops:<name>`, free or enterprise; `<name>` is the outcome in kebab-case, never the edition,
-vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` and the skills `tenant-setup`, `change-request`, `vendor-review`, `process-doc`,
-`capacity-plan`, `compliance-tracking`. The enterprise edition carries these unchanged, plus everything else, in the same-named
+vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` and the builder skills `discover`, `new-plugin`, `customize-plugin`,
+`recommend-setup`, `improve-instructions`, `capture-learnings`. The enterprise edition carries these unchanged, plus the
+operations playbooks (`tenant-setup`, `change-request`, `vendor-review`, `process-doc`, `capacity-plan`,
+`compliance-tracking`, moved from free on 2026-11-20 with their names unchanged) and everything else, in the same-named
 `1xops` plugin in the private `1xOps/1xops-enterprise` repository. Marketplaces: free `1ops` (`1xops@1ops`), enterprise `1xops` (`1xops@1xops`). Table: `plugins/1xops/README.md`.
 
 ## Release standard

@@ -1,7 +1,7 @@
 {
   "name": "1xops",
   "version": "0.3.4",
-  "description": "1xops by OceanSoft.io: cloud and AI cost checks, change requests and runbooks on real assets. Every figure sourced, read-only by default, nothing changed without a yes.",
+  "description": "1xops by OceanSoft.io: build your own plugin from approved, tested parts, starting from a job your team already does. Licence and origin kept, every step that can change things listed, nothing ships unreviewed.",
   "author": {
     "name": "Nhat-Thanh Nguyen",
     "email": "nnthanh101@gmail.com",
@@ -11,14 +11,13 @@
   "repository": "https://github.com/nnthanh101/1xops",
   "license": "Apache-2.0",
   "keywords": [
-    "finops",
+    "plugin-builder",
+    "diy",
+    "skills",
+    "connectors",
+    "governance",
     "cloudops",
-    "aws",
-    "azure",
-    "cost",
-    "change-management",
-    "runbooks",
-    "terraform"
+    "finops"
   ],
   "dependencies": [
     "operations@knowledge-work-plugins",
