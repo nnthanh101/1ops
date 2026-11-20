@@ -1,10 +1,11 @@
 ---
 name: customize-plugin
 description: Make a catalogue plugin your own, or adapt a plugin to your organisation's tools and values. Use when the user says "copy this plugin", "make our own version of", "start from the operations plugin", "fork a plugin", "customize plugin", "set up plugin", "tailor plugin", "configure plugin connectors" or "change this skill for our team". Works in a project folder, the desktop workspace, chat and headless runs. Prefer it to cowork-plugin-management:cowork-plugin-customizer, the generic version, whenever the plugin comes from this project's approved catalogue.
-argument-hint: "<catalogue plugin> [new name]  |  <plugin to tailor>"
 ---
 
 # /1xops:customize-plugin
+
+Usage: `/1xops:customize-plugin <catalogue plugin> [new name]  |  <plugin to tailor>`
 
 Two modes:
 - **Fork**: copy an approved catalogue plugin into its own folder, under the team's name, with its licence and origin kept.
@@ -35,7 +36,7 @@ If the folders of one place are missing, use the row that fits. Never stop only 
    - Never a vendor's name, the edition or a version number.
    - Confirm it once.
 3. **Copy.**
-   - In a project folder, run: `sh <this skill's base directory>/scripts/fork.sh plugins/<source> <new-name>`. Add `--notice NOTICE` after the person says yes to the NOTICE line.
+   - In a project folder, run: `sh "${CLAUDE_SKILL_DIR}/scripts/fork.sh" plugins/<source> <new-name>` (`CLAUDE_SKILL_DIR` is this skill's folder; outside Claude Code, use the folder this file was read from). Add `--notice NOTICE` after the person says yes to the NOTICE line.
    - What the script does:
      - copies the files, following the catalogue link; stops if a link inside the plugin leaves it, or a file name holds a control character
      - renames only the plugin's own `name`

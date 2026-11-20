@@ -6,7 +6,8 @@
 | Repository | https://github.com/anthropics/knowledge-work-plugins |
 | Pinned commit | `e91a134584eb798bac7fb0379358006a2b63b965` |
 | Copied on | 2026-11-20 |
-| Licence | Apache-2.0, `LICENSE.txt` |
+| Licence | Apache-2.0: the repository's `LICENSE`; every third party is listed in its `NOTICE` |
+| Modifications | Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io (oceansoft.io), Apache-2.0 |
 
 ## What 1xops changed
 

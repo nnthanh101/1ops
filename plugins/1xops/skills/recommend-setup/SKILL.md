@@ -1,10 +1,11 @@
 ---
 name: recommend-setup
 description: Recommend settings, plugins, connectors, skills, hooks and helpers for a project, drawn only from what this project has approved, each marked tested, approved or not approved. Use when the user says "what should we turn on", "recommend a setup", "set up this project", "which plugins should we use", "optimize our setup", "first-time setup" or "what automations would help". Read-only. Prefer it to claude-code-setup:claude-automation-recommender, the generic version, whenever this project has an approved catalogue.
-argument-hint: "[connectors|plugins|skills|hooks|helpers|settings]"
 ---
 
 # /1xops:recommend-setup
+
+Usage: `/1xops:recommend-setup [connectors|plugins|skills|hooks|helpers|settings]`
 
 Act as a trusted advisor. Recommend the smallest setup that serves the team's job, using parts this project has already approved and, where possible, tested. Then the team can spend its time on business value rather than on comparing tools.
 

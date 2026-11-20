@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | draft · ready to build · built · in use |
-| Evidence | <previous artefact in `examples/`, or "from memory"> |
+| Evidence | <previous artefacts in `evidence/`, or "from memory"> |
 | Tenant | <one tenant: company, team or customer> |
 | Version | 0.1.0 (previous working version: <none or tag>) |
 
@@ -18,8 +18,8 @@
 - A finding is actionable when:
 - Routinely dismissed (exclusions):
 - Thresholds and confidence:
-- Worked example of a good result: `examples/good-1.md`
-- Worked example of a dismissed result: `examples/dismissed-1.md`
+- Worked example of an accepted result: `evidence/accepted-1.md`
+- Worked example of a dismissed result: `evidence/dismissed-1.md`
 
 ## 3. Minimum data (owner: engineer)
 | Source | Identifier expected | Time range | Approved connector | Doctor status |
@@ -46,7 +46,7 @@
 
 ## 7. Improvement
 - Corrections recorded in:
-- Replay set: <at least five past cases in `examples/`>
+- Replay set: <at least five past cases in `evals/<case>/`>
 - A change is approved by <role> and rolled back by <how>
 
 ## Open questions

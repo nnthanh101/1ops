@@ -5,13 +5,13 @@
     "email": "nnthanh101@gmail.com"
   },
   "metadata": {
-    "description": "1xops free edition by OceanSoft.io: /1xops:check and the plugin builder (discover, new-plugin, customize-plugin, recommend-setup, improve-instructions, capture-learnings). Free, open source (Apache-2.0). Enterprise: marketplace 1xops."
+    "description": "1xops free edition by OceanSoft.io: /1xops:check and the plugin builder (discover, new-plugin, customize-plugin, recommend-setup, improve-instructions, capture-learnings, overview). Free, open source (Apache-2.0). Enterprise: marketplace 1xops."
   },
   "plugins": [
     {
       "name": "1xops",
       "source": "./plugins/1xops",
-      "description": "Build your own plugin from approved, tested parts, starting from a job your team already does. Licence and origin kept; nothing ships unreviewed."
+      "description": "Build your own plugin from approved, tested parts, starting from a job your team already does. Licence and origin kept; nothing ships unreviewed. Installs 12 library plugins it builds from: operations, cowork-plugin-management, customer-support, data, engineering, enterprise-search, finance, human-resources, marketing, product-management, sales, small-business."
     }
   ],
   "allowCrossMarketplaceDependenciesOn": [

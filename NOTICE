@@ -72,8 +72,14 @@ Derived code (copied once; no upstream link is kept or tracked)
     Approved by the maintainer on 2026-11-20 (1XOPS-027). customize-plugin and new-plugin are derived from
     cowork-plugin-management (https://github.com/anthropics/knowledge-work-plugins, commit e91a134);
     recommend-setup from claude-code-setup, improve-instructions and capture-learnings from claude-md-management
-    (https://github.com/anthropics/claude-plugins-official, commit 30c0ac7). discover is new. Each folder keeps its
-    Apache-2.0 licence and an UPSTREAM.md with its origin and what 1xops changed.
+    (https://github.com/anthropics/claude-plugins-official, commit 30c0ac7). discover is new. overview takes its page
+    layout (the overview template; its stylesheet was re-authored on 2026-11-20) and close-out pattern from
+    https://github.com/1xOps/managed-agents (commit 6d37c08), itself derived from Anthropic's Apache-2.0 reference skill;
+    approved by the maintainer on 2026-11-20. Each folder keeps an UPSTREAM.md with its origin, pinned commit and what
+    1xops changed.
+    Original material: Copyright 2026 Anthropic PBC, licensed under the Apache License, Version 2.0 (LICENSE in this
+    repository). Since 2026-11-20 the per-skill licence copies are removed: this NOTICE is the one place for every notice.
+    Modifications: Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io (oceansoft.io).
   Desktop Commander MCP    https://github.com/wonderwhy-er/DesktopCommanderMCP    MIT
     Approved by the maintainer on 2026-11-18. Used in npm "@1xops/command-center" 0.1.0 to
     0.4.2 (derived from version 0.3.3; retired). The 1xops enterprise desktop server is written
