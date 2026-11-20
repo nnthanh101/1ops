@@ -37,10 +37,11 @@ If the folders of one place are missing, use the row that fits. Never stop only 
 3. **Copy.**
    - In a project folder, run: `sh <this skill's base directory>/scripts/fork.sh plugins/<source> <new-name>`. Add `--notice NOTICE` after the person says yes to the NOTICE line.
    - What the script does:
-     - copies the files, following the link
+     - copies the files, following the catalogue link; stops if a link inside the plugin leaves it, or a file name holds a control character
      - renames only the plugin's own `name`
      - keeps the plugin's licence, or takes the repository's licence text
-     - writes `UPSTREAM.md` with the source, pinned commit, date, licence and a review list
+     - records the origin without any sign-in that may be in the repository address
+     - writes `UPSTREAM.md` with the source, pinned commit, date, licence and a review list; a file it could not read is listed as "check by hand", never left out
      - refuses an existing folder, never edits `marketplace.json`, and exits non-zero on any problem
    - Elsewhere, do the same steps with the tools you have:
      - copy every file
@@ -56,24 +57,28 @@ If the folders of one place are missing, use the row that fits. Never stop only 
    - The release check refuses a link and accepts a reviewed folder.
    - If the copy has connectors, run `1xops doctor` before listing it.
 
-`UPSTREAM.md` shape:
+`UPSTREAM.md` shape (the review list sits in a plain-text block, so no name in it can hide another line):
 
-```markdown
+````markdown
 # Origin of <name>
 | | |
 |---|---|
 | Copied from | `<path in the vendor repository>` (plugin `<old name>`) |
-| Repository | <vendor repository URL> |
+| Repository | <vendor repository URL, without any sign-in> |
 | Pinned commit | `<commit>` |
 | Copied on | <YYYY-MM-DD> |
 | Licence | <licence>, <which file> |
 
 ## Review before it ships
+```text
 - connector: <name>
-- hook: hooks/hooks.json runs on events without being asked
+- hook: <hook file> runs on <event> without being asked: <command>
 - script: <path>
 - can write or run commands: <file>
+- helper with every tool (no tools list): <file>
+- check by hand: <a file that could not be read>
 ```
+````
 
 Rules:
 - The link stays in the catalogue. A fork is a new folder, never a link turned into a copy in place.
