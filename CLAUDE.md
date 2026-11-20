@@ -54,7 +54,7 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 ## Commands: one namespace
 Every command and skill is `/1xops:<name>`, free or enterprise; `<name>` is the outcome in kebab-case, never the edition,
 vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` and the builder skills `discover`, `new-plugin`, `customize-plugin`,
-`recommend-setup`, `improve-instructions`, `capture-learnings`. The enterprise edition carries these unchanged, plus the
+`recommend-setup`, `improve-instructions`, `capture-learnings`, `overview`. The enterprise edition carries these unchanged, plus the
 operations playbooks (`tenant-setup`, `change-request`, `vendor-review`, `process-doc`, `capacity-plan`,
 `compliance-tracking`, moved from free on 2026-11-20 with their names unchanged) and everything else, in the same-named
 `1xops` plugin in the private `1xOps/1xops-enterprise` repository. Marketplaces: free `1ops` (`1xops@1ops`), enterprise `1xops` (`1xops@1xops`). Table: `plugins/1xops/README.md`.

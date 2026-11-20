@@ -6,7 +6,8 @@
 | Repository | https://github.com/anthropics/claude-plugins-official |
 | Pinned commit | `30c0ac7ff8f2f6e741ed8204d5997f14bf80b481` |
 | Copied on | 2026-11-20 |
-| Licence | Apache-2.0, `LICENSE` |
+| Licence | Apache-2.0: the repository's `LICENSE`; every third party is listed in its `NOTICE` |
+| Modifications | Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io (oceansoft.io), Apache-2.0 |
 
 ## What 1xops changed
 

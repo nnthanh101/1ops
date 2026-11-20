@@ -288,10 +288,38 @@ def check_edition() -> tuple[str, bool, bool, str]:
         source = read("known_marketplaces.json").get("1xops", {}).get("source", {})
         if source.get("repo") == "nnthanh101/1xops":
             return ("edition", False, False, "free, old marketplace name: run 1xops install --yes")
-        return ("edition", False, True, f"enterprise {version('1xops@1xops')}".strip())
+        return _edition_row("enterprise", version("1xops@1xops"))
     if "1xops@1ops" in installed:
-        return ("edition", False, True, f"free {version('1xops@1ops')}".strip())
+        return _edition_row("free", version("1xops@1ops"))
     return ("edition", False, False, "plugin not installed: 1xops install --yes")
+
+
+def _semver(text: str) -> tuple[int, ...]:
+    """Major, minor, patch, padded with zeros so 1.2 equals 1.2.0, as in the Node channel."""
+    parts = [int(n) for n in re.findall(r"\d+", text)[:3]]
+    return tuple(parts + [0] * (3 - len(parts)))
+
+
+def _edition_row(edition: str, plugin: str) -> tuple[str, bool, bool, str]:
+    """The plugin and this command ship together: name the one that is behind, with its update."""
+    found = f"{edition} {plugin}".strip()
+    if not plugin or "+source" in __version__:  # a source checkout has no version to compare
+        return ("edition", False, True, found)
+    if _semver(plugin) > _semver(__version__):
+        return (
+            "edition",
+            False,
+            False,
+            f"{found}; this 1xops command is {__version__}: uv tool upgrade 1xops (or npm install -g 1xops)",
+        )
+    if _semver(plugin) < _semver(__version__):
+        return (
+            "edition",
+            False,
+            False,
+            f"{found}; this 1xops command is {__version__}: run /plugin update 1xops in the assistant",
+        )
+    return ("edition", False, True, found)
 
 
 READER_HINT = (
@@ -646,18 +674,34 @@ NEEDS = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
 ENV_FIX = 'in .env.1xops, then start the assistant from a shell that ran eval "$(1xops env)"'
 
 
+def folder_plugins() -> set[str]:
+    """The plugins this folder turns on (`.claude/settings.json`, `.claude/settings.local.json`), so a check names
+    the connectors the folder's job uses and not every library default. Read-only."""
+    keys: set[str] = set()
+    for name in ("settings.json", "settings.local.json"):
+        try:
+            enabled = json.loads((Path(".claude") / name).read_text()).get("enabledPlugins", {})
+            keys |= {k for k, on in enabled.items() if on is True}
+        except (OSError, ValueError, AttributeError):
+            continue
+    if Path(".env.1xops").is_file():  # a tenant folder runs the operations playbooks
+        keys.add("operations@knowledge-work-plugins")
+    return keys
+
+
 def plugin_connectors() -> list[tuple[str, str, str]]:
-    """(server (plugin), status, fix) for the servers of the installed 1xops plugin and of the operations plugin
-    it depends on, from the host's own plugin records. Reads no token, makes no call."""
+    """(server (plugin), status, fix) for the servers of the installed 1xops plugin and of the plugins this folder
+    turns on, from the host's own plugin records. Reads no token, makes no call."""
     folder = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / f".{s.HOST}") / "plugins"
     try:
         installed = json.loads((folder / "installed_plugins.json").read_text()).get("plugins", {})
     except (OSError, ValueError, AttributeError):
         return []
+    wanted = folder_plugins()
     rows = []
     for key, entries in installed.items():
         plugin = key.partition("@")[0]
-        if plugin != "1xops" and key != "operations@knowledge-work-plugins":
+        if plugin != "1xops" and key not in wanted:
             continue
         try:
             data = json.loads((Path(entries[0]["installPath"]) / ".mcp.json").read_text())

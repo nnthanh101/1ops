@@ -185,17 +185,29 @@ export function checkTools() {
 }
 
 // Which 1xops plugin edition is installed, from the host's own plugin records. Read-only.
-export function checkEdition() {
+export function checkEdition(cli = '') {
   const folder = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(homedir(), `.${s.HOST}`), 'plugins');
   const read = (name) => { try { return JSON.parse(readFileSync(path.join(folder, name), 'utf8')); } catch { return {}; } };
   const installed = read('installed_plugins.json').plugins ?? {};
   const version = (key) => (installed[key]?.[0]?.version ?? '');
   if ('1xops@1xops' in installed) {
     if (read('known_marketplaces.json')['1xops']?.source?.repo === 'nnthanh101/1xops') return ['edition', false, false, 'free, old marketplace name: run 1xops install --yes'];
-    return ['edition', false, true, `enterprise ${version('1xops@1xops')}`.trim()];
+    return editionRow('enterprise', version('1xops@1xops'), cli);
   }
-  if ('1xops@1ops' in installed) return ['edition', false, true, `free ${version('1xops@1ops')}`.trim()];
+  if ('1xops@1ops' in installed) return editionRow('free', version('1xops@1ops'), cli);
   return ['edition', false, false, 'plugin not installed: 1xops install --yes'];
+}
+
+const semver = (text) => (String(text).match(/\d+/g) ?? []).slice(0, 3).map(Number);
+const compare = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] ?? 0) - (b[i] ?? 0); if (d) return Math.sign(d); } return 0; };
+
+// The plugin and this command ship together: name the one that is behind, with its update.
+function editionRow(edition, plugin, cli) {
+  const found = `${edition} ${plugin}`.trim();
+  const order = plugin && cli ? compare(semver(plugin), semver(cli)) : 0;
+  if (order > 0) return ['edition', false, false, `${found}; this 1xops command is ${cli}: uv tool upgrade 1xops (or npm install -g 1xops)`];
+  if (order < 0) return ['edition', false, false, `${found}; this 1xops command is ${cli}: run /plugin update 1xops in the assistant`];
+  return ['edition', false, true, found];
 }
 
 const READER_HINT = `use a Reader identity in its own folder: AZURE_CONFIG_DIR=~/.azure-reader az login${ON_HOST}`;
@@ -377,16 +389,31 @@ export function checkConnectors(file, rows = []) {
 
 const ENV_FIX = 'in .env.1xops, then start the assistant from a shell that ran eval "$(1xops env)"';
 
-// [server (plugin), status, fix] for the servers of the installed 1xops plugin and of the operations plugin it
-// depends on, from the host's own plugin records. Reads no token, makes no call.
+// The plugins this folder turns on (.claude/settings.json, .claude/settings.local.json), so a check names the
+// connectors the folder's job uses and not every library default. Read-only.
+export function folderPlugins() {
+  const keys = new Set();
+  for (const name of ['settings.json', 'settings.local.json']) {
+    try {
+      const enabled = JSON.parse(readFileSync(path.join('.claude', name), 'utf8')).enabledPlugins ?? {};
+      for (const [k, on] of Object.entries(enabled)) if (on === true) keys.add(k);
+    } catch { /* no settings here */ }
+  }
+  if (existsSync('.env.1xops')) keys.add('operations@knowledge-work-plugins'); // a tenant folder runs the operations playbooks
+  return keys;
+}
+
+// [server (plugin), status, fix] for the servers of the installed 1xops plugin and of the plugins this folder
+// turns on, from the host's own plugin records. Reads no token, makes no call.
 export function pluginConnectors() {
   const folder = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(homedir(), `.${s.HOST}`), 'plugins');
   let installed;
   try { installed = JSON.parse(readFileSync(path.join(folder, 'installed_plugins.json'), 'utf8')).plugins ?? {}; } catch { return []; }
+  const wanted = folderPlugins();
   const rows = [];
   for (const [key, entries] of Object.entries(installed)) {
     const plugin = key.split('@')[0];
-    if (plugin !== '1xops' && key !== 'operations@knowledge-work-plugins') continue;
+    if (plugin !== '1xops' && !wanted.has(key)) continue;
     let servers;
     try {
       const data = JSON.parse(readFileSync(path.join(entries[0].installPath, '.mcp.json'), 'utf8'));
@@ -486,7 +513,7 @@ export function doctor(opts, version) {
   // The identity calls take seconds; a status line on a terminal (cleared after), nothing when piped.
   const tty = process.stdout.isTTY;
   if (tty) process.stdout.write(color('dim', 'Checking tools, sign-ins and connectors (read-only)…'));
-  const all = [...checkTools(), ...(CONTAINER && !which(s.HOST) ? [] : [checkEdition()]), ...checkSignIn(opts['aws-profile'])];
+  const all = [...checkTools(), ...(CONTAINER && !which(s.HOST) ? [] : [checkEdition(version)]), ...checkSignIn(opts['aws-profile'])];
   const connectors = connectorRows(opts.file, []);
   const covered = coveredSignIns(connectors, opts['aws-profile']);
   const rows = all.filter((r) => !covered.has(r[0]));

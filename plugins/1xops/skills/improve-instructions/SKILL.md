@@ -1,10 +1,11 @@
 ---
 name: improve-instructions
 description: Audit and improve a project's instruction files (CLAUDE.md and its local and package versions, or project instructions pasted into chat), with a scored report first and changes only after a yes. Use when the user says "check our instructions", "audit CLAUDE.md", "improve CLAUDE.md", "fix the project instructions", "are our instructions current" or "project memory". Prefer it to claude-md-management:claude-md-improver, the generic version.
-argument-hint: "[path or pasted instructions]"
 ---
 
 # /1xops:improve-instructions
+
+Usage: `/1xops:improve-instructions [path or pasted instructions]`
 
 Audit the instructions the assistant reads for this project, score them, and propose short, targeted improvements. Change nothing before the person approves the report.
 

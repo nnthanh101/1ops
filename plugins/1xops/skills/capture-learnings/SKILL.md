@@ -1,12 +1,39 @@
 ---
 name: capture-learnings
-description: Turn what this session learned into short additions to the project's instructions (CLAUDE.md or pasted project instructions), shown as a diff and applied only after a yes. Use when the user says "capture what we learned", "update CLAUDE.md with this session", "remember this for next time", "revise the instructions" or at the end of a working session. Prefer it to claude-md-management:revise-claude-md, the generic version.
-argument-hint: "[what to focus on]"
+description: Turn what this session learned, and every question, correction or steer a person gave, into the right kind of change, applied only after a yes. A correction becomes a test case, a new need becomes a feature request, and a working habit becomes a short addition to the project's instructions. Use when the user says "capture the feedback", "turn my comments into tests", "capture what we learned", "update CLAUDE.md with this session", "remember this for next time", "revise the instructions" or at the end of a working session. Prefer it to claude-md-management:revise-claude-md, the generic version.
 ---
 
 # /1xops:capture-learnings
 
-Review this session for what would have helped it go faster. Propose one-line additions to the project's instructions, so the next session starts with that context.
+Usage: `/1xops:capture-learnings [what to focus on]`
+
+Review this session for two things:
+- **What people said:** every question, correction, comment or steer from the person (the human in the loop).
+- **What would have made the session faster.**
+
+Turn each one into the right kind of change, so the plugin gets better with every review and the person can see they were heard.
+
+## 0. Sort what people said
+
+Each item becomes exactly one of these:
+
+| Type | When | Becomes |
+|---|---|---|
+| Test case | the person corrected a result ("that figure is wrong", "this data is real") | a replay case in `workflows/<job>/evals/<case>/` (`prompt.md` + `graders/expected.md`), so the mistake can't come back |
+| Feature request | the person asked for something the plugin can't do yet | one line in the job's Next sheet (or `feedback.md`): what, for whom, and the version it lands in |
+| Instruction fix | the person stated a rule or a preference ("always ask before…") | a one-line addition to the instructions (steps 1–5 below) |
+| Answered | a question that was answered and needs no change | listed only, so nothing is lost |
+
+Write them to `workflows/<job>/feedback.md` (or to the reply in chat) as a table:
+
+| # | Said by (role) | Their words | Type | Why it matters | What it changes | If we don't |
+|---|---|---|---|---|---|---|
+
+Rules:
+- Use their own words.
+- One row per item, and never merge two people's points.
+- Mask customers', people's and account names.
+- Nothing is written or applied until the person says yes to each row. A no leaves that row out and changes nothing.
 
 ## 1. Reflect
 
@@ -52,6 +79,6 @@ find . -name "CLAUDE.md" -o -name "CLAUDE.local.md" 2>/dev/null | grep -v node_m
 
 ## 5. Apply after a yes
 
-- **Project folder:** edit only the files the person approves.
+- **Project folder:** edit only the files the person approves: the instructions, `feedback.md`, the eval cases and the Next sheet.
 - **Chat:** return the final text to paste.
 - **Headless run:** write the proposal and apply nothing unless the brief approves it.

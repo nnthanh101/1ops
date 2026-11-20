@@ -1,12 +1,13 @@
 ---
 name: new-plugin
 description: Build a new plugin from a workflow spec, using only approved catalogue parts. Use when the user says "build the plugin", "create a plugin", "make a new plugin", "scaffold a plugin", "turn this spec into a plugin" or "design a plugin". Works in a project folder, the desktop workspace, chat and headless runs. Prefer it to cowork-plugin-management:create-cowork-plugin, the generic version, whenever this project's approved catalogue is available.
-argument-hint: "<workflow spec path, or a one-line description>"
 ---
 
 # /1xops:new-plugin
 
-Build a plugin that does one job the team already does, from approved parts, and prove it against the job's own examples.
+Usage: `/1xops:new-plugin <workflow spec path, or a one-line description>`
+
+Build a plugin that does one job the team already does, from approved parts, and prove it against the job's own evidence.
 
 Keep the conversation in plain language: what the plugin will do, not file paths or schema fields, unless the person asks.
 
@@ -22,9 +23,10 @@ Keep the conversation in plain language: what the plugin will do, not file paths
 ## Start from the job, not from components
 
 1. **Spec.**
-   - Read the workflow spec: `workflows/<job>/spec.md`, or the one the person gives.
+   - Read the workflow spec: `workflows/<job>/spec.md`, or the one the person gives. If `workflows/<job>/plugin.xlsx` exists, its role sheets win over the spec for business rules, integrations and access. Say so when they differ.
    - If there is none, run `/1xops:discover` first. A one-line description is not enough to build from.
    - If the spec has no step 6 (proof) or step 7 (improvement), say so and stop.
+   - Name the commands, skills, agents and connectors from the workbook's Lifecycle sheet. If a name breaks the naming table in `/1xops:discover`, propose a fix and ask.
 2. **Reuse before building.**
    - Look in the approved catalogue first: links in `plugins/`, and plugins installed from approved marketplaces.
    - If one already does most of the job, use `/1xops:customize-plugin` to fork it. Then add only what is missing.
@@ -69,7 +71,7 @@ Create, in this order:
    - Use `${VAR}` for every credential or host-specific value.
    - Never write a secret into a file.
    - Use HTTPS for remote servers.
-4. `evals/<job>/`: the spec's worked examples (good, dismissed, and the replay set) as cases with their expected result. They are the plugin's first test.
+4. `evals/<case>/`: one folder per case from the spec's `evals/` (accepted, dismissed and the replay set), in the format `claude plugin eval` runs: `prompt.md` and `graders/` (a `regex` or `file_exists` grader where the answer is exact, an `llm` grader with the expected result otherwise). They are the plugin's first test.
 5. `README.md`: what it does, who approves what, the connectors and how to sign in, and what has not been proven yet.
 6. `UPSTREAM.md`, when any part was copied from the catalogue: the origin and the review list (see `/1xops:customize-plugin`).
 
@@ -92,11 +94,11 @@ Use `~~category` placeholders only if the person says the plugin will be shared 
      - hooks sit under a top-level `"hooks"` object
      - every referenced file exists
    - Fix every error before going on.
-3. Run the job once on the spec's examples, with synthetic or redacted data. Show the result next to the expected one, with every difference. The reviewer named in the spec accepts or rejects it. Record the answer in the spec's step 6.
+3. Run `claude plugin eval <plugin>` when it is available, otherwise run the job once on each case in `evals/`, with synthetic or redacted data. Show the result next to the expected one, with every difference. The reviewer named in the spec accepts or rejects it. Record the answer in the spec's step 6.
 4. Deliver for the place you are running in (table above). Zip to a temporary folder first, then copy:
 
    ```bash
-   cd <plugin> && zip -r "$TMPDIR/<name>.plugin" . -x "*.DS_Store" && cp "$TMPDIR/<name>.plugin" <outputs>/
+   cd <plugin> && zip -r "$TMPDIR/<name>.plugin" . -x "*.DS_Store" && zip -j "$TMPDIR/<name>.plugin" <repo>/LICENSE <repo>/NOTICE && cp "$TMPDIR/<name>.plugin" <outputs>/
    ```
 
 5. Tell the person:

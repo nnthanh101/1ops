@@ -1,0 +1,228 @@
+<!doctype html>
+<!-- Brand sheet: when the buyer gave colours, set them as style="--brand:#…; --brand-accent:#…" on <html> (never an inline style block); lang from the locale. Every [bracket] is a slot: fill it from the workbook or the plugin files, or write "not yet". -->
+<html lang="en" data-slot="Brand.colours">
+<head>
+<meta charset="utf-8">
+<!-- Plugin overview template from 1xops /1xops:overview. Copyright 2026 Nhat-Thanh Nguyen (nnthanh101@gmail.com), OceanSoft.io.
+     Apache-2.0; design derived from 1xOps/managed-agents and Anthropic's reference skill (see UPSTREAM.md). -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title data-slot="Brand.title">[Plugin name] · [Display name]</title>
+<!-- overview.css is copied once next to this page; the link stays relative, never inline a <style> block -->
+<link rel="stylesheet" href="overview.css">
+<script>
+  /* theme: system by default; the switch stores the reader's choice for this page only */
+  (function () { try { var t = localStorage.getItem('plugin-overview-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {} })();
+</script>
+</head>
+<body>
+<!-- Every fact on this page comes from plugin.xlsx (sheet · column named in each data-slot) or a plugin file.
+     A slot with no source says "not yet" or "open"; never a guess. Edit slots in place; never rewrite the page. -->
+<div class="wrap">
+
+  <!-- ── top bar: identity, state, four stat cells ── -->
+  <div class="topbar">
+    <div class="ident">
+      <div class="sigil brand-mark" data-slot="Brand.logo"><img src="assets/logo.png" alt="" onerror="this.replaceWith('🧩')"></div>
+      <div>
+        <div class="title-row">
+          <h1 data-slot="Plugin.name">[Plugin name]</h1>
+          <!-- state: PLANNED · BUILT · VALIDATED · PROVEN · LISTED; .live from VALIDATED on; title = the one-line reason -->
+          <span class="statepill planned" data-slot="Plugin.state" title="[one-line reason]"><span class="led planned"></span>[STATE]</span>
+        </div>
+        <div class="byline"><span class="brand-name" data-slot="Brand.name">[Display name]</span> · <span data-slot="Job.owner">[Owner role]</span> · <span data-slot="Job.domain">[Business domain]</span> · updated <span data-slot="Plugin.updated">[date]</span></div>
+      </div>
+      <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-choice="" aria-pressed="true">auto</button>
+        <button type="button" data-theme-choice="light" aria-pressed="false">light</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">dark</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-k">Version</div><div class="stat-v" data-slot="Plugin.version">[version]</div></div>
+      <div class="stat"><div class="stat-k">Runs in</div><div class="stat-v" data-slot="Plugin.surfaces">[proven surfaces] <span class="dim">· [not yet]</span></div></div>
+      <div class="stat"><div class="stat-k">Can change things</div><div class="stat-v" data-slot="Access.count_change">[n] <span class="dim">after a yes</span></div></div>
+      <div class="stat"><div class="stat-k">Shipped</div><div class="stat-v" data-slot="Plugin.listed">[yes · no]</div></div>
+    </div>
+  </div>
+
+  <!-- ── business case first (Job sheet, reviewed by leadership): the outcome, the numbers the owner stated, the decision asked ── -->
+  <div class="value">
+    <p class="value-lede" data-slot="Job.value">[The value, in the owner's own words]</p>
+    <p class="value-sub" data-slot="Access.summary">[What it may change, and who says yes]</p>
+  </div>
+  <p class="lane-label">Business case</p>
+  <div class="figures" data-slot="Job.case">
+    <div class="figure"><div class="figure-v">[baseline]</div><div class="figure-k">Baseline per run</div><div class="figure-src">Job · baseline</div></div>
+    <div class="figure"><div class="figure-v">[target]</div><div class="figure-k">Target</div><div class="figure-src">Job · target</div></div>
+    <div class="figure"><div class="figure-v">[measured · not yet]</div><div class="figure-k">Measured</div><div class="figure-src">Proof · after a real run</div></div>
+    <div class="figure"><div class="figure-v">[n of m]</div><div class="figure-k">Cases passed</div><div class="figure-src">Proof · verdicts</div></div>
+  </div>
+  <div class="lane decision">
+    <div class="lane-head"><span class="node-icon">🧭</span><h2>Decision asked</h2><span class="lane-meta" data-slot="Job.reviewed">reviewed by: [role · date · not yet]</span></div>
+    <div class="lane-body">
+      <p class="value-proof" data-slot="Job.decision"><b>[The decision asked of leadership]</b></p>
+      <div class="cfoot" data-slot="Proof.summary"><span class="cf-i">🎯</span><span>[What is proven, and what is not yet]</span></div>
+    </div>
+  </div>
+
+  <!-- ── schema: how it starts → what it does → what it hands over; then the parts | the proof ── -->
+  <p class="lane-label">How it works · for the CTO</p>
+  <div class="schema3">
+    <p class="col-title s-t1">Starts</p>
+    <p class="col-title s-t2">Plugin</p>
+    <p class="col-title s-t3">Hands over</p>
+
+    <div class="s-a1 node key">
+      <div class="node-head"><span class="node-icon">▶️</span><h2>Trigger</h2></div>
+      <div class="node-body">
+        <!-- one .mode per way it starts (Components sheet: kind = command | skill | hook) -->
+        <div class="mode">
+          <div class="mode-h">💬 Command <span class="chip good">v0</span></div>
+          <dl class="kv">
+            <dt>runs</dt><dd><code data-slot="Components.trigger">/[plugin]:[command]</code></dd>
+            <dt>when</dt><dd data-slot="Job.trigger">[trigger and frequency]</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="joint s-j1" aria-hidden="true"><span class="pulse"></span></div>
+
+    <div class="s-a2">
+      <div class="node key">
+        <div class="node-head"><span class="node-icon">🧩</span><h2>Plugin · <span data-slot="Plugin.name">[Plugin name]</span></h2></div>
+        <div class="node-body">
+          <div class="field"><div class="field-k">What it does</div>
+            <p class="job" data-slot="Job.description">[What it does, from the Job sheet]</p></div>
+          <div class="field"><div class="field-k">How · Business rules sheet</div>
+            <div class="steps" data-slot="Rules.steps"><span class="chip">[stage]</span><span class="chip">[stage]</span></div></div>
+          <div class="field"><div class="field-k">Never · Access sheet</div>
+            <div class="chips" data-slot="Access.never"><span class="chip never">[never]</span></div></div>
+          <p class="note proof" data-slot="Access.stop"><b>[Where it stops.]</b> [Who decides what leaves.]</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="s-e env-band">
+      <div class="node-foot env-foot">
+        <div class="env-l"><span class="env-k">runs</span><span data-slot="Plugin.host">[where it runs]</span></div>
+        <div class="env-l"><span class="env-k">reads</span><span data-slot="Integrations.reads">[sources]</span></div>
+        <div class="env-l"><span class="env-k">identity</span><span data-slot="Integrations.identity">[identity, checked by 1xops doctor]</span></div>
+      </div>
+    </div>
+    <div class="joint s-j2" aria-hidden="true"><span class="pulse"></span></div>
+
+    <div class="s-a3 node">
+      <div class="node-head"><span class="node-icon">📤</span><h2>Deliverables</h2></div>
+      <div class="node-body" data-slot="Job.deliverables">
+        <div class="dl"><span class="dl-i">📄</span><div class="dl-b"><div class="dl-h"><b>[Deliverable]</b><span class="dests"><span class="dest">[format]</span></span></div><div class="dl-s">for [role]</div></div></div>
+      </div>
+    </div>
+
+    <!-- six component cards (Components sheet). An unused kind is .attach.ghost. Anything that can change things gets .chip.change and its approver. -->
+    <div class="s-b2">
+      <div class="attach-grid">
+        <div class="attach">
+          <h3>📄 Skills<span class="where w-box">in the assistant</span></h3>
+          <ul class="plist stack" data-slot="Components.skills"><li><span class="lgs"></span><b>[skill]</b><span class="sub">[what it may change]</span></li></ul>
+          <div class="cfoot"><span class="cf-i">🧪</span><span>Replay the evals before a new version ships</span></div>
+        </div>
+        <div class="attach ghost">
+          <h3>💬 Commands<span class="where w-none">none</span></h3>
+          <ul class="plist stack" data-slot="Components.commands"><li class="empty"><span class="lgs"></span><b>not used</b></li></ul>
+        </div>
+        <div class="attach">
+          <h3>🔌 Connectors<span class="where w-plat">sign in in the host</span></h3>
+          <ul class="plist stack" data-slot="Integrations.connectors">
+            <li><span class="lgs"></span><b>[connector]</b><span class="sub">[read · draft · after a yes] <span class="chip change">approver: [role]</span></span></li>
+          </ul>
+          <div class="cfoot"><span class="cf-i">✋</span><span>Every write waits for a person</span></div>
+        </div>
+        <div class="attach ghost">
+          <h3>🪝 Hooks<span class="where w-none">none</span></h3>
+          <ul class="plist stack" data-slot="Components.hooks"><li class="empty"><span class="lgs"></span><b>not used</b><span class="sub">a hook runs without being asked: administrator's yes</span></li></ul>
+        </div>
+        <div class="attach ghost">
+          <h3>🤖 Agents<span class="where w-none">none</span></h3>
+          <ul class="plist stack" data-slot="Components.agents"><li class="empty"><span class="lgs"></span><b>not used</b></li></ul>
+        </div>
+        <div class="attach">
+          <h3>🧭 Origin<span class="where w-box">licence kept</span></h3>
+          <ul class="plist stack" data-slot="Origin.parts"><li><span class="lgs"></span><b>[part]</b><span class="sub">[origin · pinned commit · licence]</span></li></ul>
+          <div class="cfoot"><span class="cf-i">📜</span><span>Copied parts keep their licence, NOTICE line and pinned commit</span></div>
+        </div>
+      </div>
+      <p class="lights-legend" aria-label="Status lights"><span>🟢 proven on a real case</span><span>🟡 built, not proven</span><span>🔵 planned</span></p>
+    </div>
+
+    <!-- proof: the spec's pass mark as checks (Proof sheet), each pass / fail / not run -->
+    <div class="s-b3 node key">
+      <div class="node-head"><span class="node-icon">🎯</span><h2>Proof</h2><span class="node-meta">pass mark</span></div>
+      <div class="node-body">
+        <div class="og">ready</div>
+        <div data-slot="Readiness.rows">
+          <div class="ready-row"><span aria-hidden="true">🟡</span><div><b>[check]</b><div class="fix">[exact fix from 1xops doctor]</div></div></div>
+        </div>
+        <div class="og">checks</div>
+        <ol class="oc" data-slot="Proof.checks">
+          <li><span class="ci">✅</span><span class="cn"><b>Strict validation</b><span class="st">[passed · failed · not run]</span></span><span class="cd">claude plugin validate --strict</span></li>
+          <li class="key"><span class="ci">🎯</span><span class="cn"><b>Pass mark</b><span class="st">not run</span></span><span class="cd">[pass mark from the spec]</span></li>
+        </ol>
+        <div class="cfoot"><span class="cf-i">🧾</span><span>Proof comes from a real case, never made-up data</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── who approves what (Access sheet) ── -->
+  <div class="lane">
+    <div class="lane-head"><span class="node-icon">✋</span><h2>Who approves what</h2><span class="lane-meta">Access sheet · administrator</span></div>
+    <div class="lane-body"><div class="overflow">
+      <table>
+        <thead><tr><th>Operation</th><th>Permission</th><th>Approver</th><th>Where it lands</th></tr></thead>
+        <tbody data-slot="Access.rows">
+          <tr><td>[operation]</td><td><span class="tag">[read · draft · after a yes · never]</span></td><td>[approver]</td><td>[destination]</td></tr>
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+
+  <!-- ── evals and runs (Proof sheet) ── -->
+  <div class="lane">
+    <div class="lane-head"><span class="node-icon">🧪</span><h2>Evals and runs</h2><span class="lane-meta" data-slot="Proof.count">[n] cases · [n] runs</span></div>
+    <div class="lane-body"><div class="overflow">
+      <table>
+        <thead><tr><th>Case</th><th>Input</th><th>Known-good answer</th><th>Verdict</th></tr></thead>
+        <tbody data-slot="Proof.evals">
+          <tr><td class="mono">case-01</td><td>[real input, redacted]</td><td>[known-good answer]</td><td><span class="tag">not run</span></td></tr>
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+
+  <!-- ── version rail (Next sheet) and open questions ── -->
+  <div class="lane">
+    <div class="lane-head"><span class="node-icon">🧭</span><h2>Next versions</h2><span class="lane-meta">open: <span data-slot="Next.open_count">[n]</span></span></div>
+    <div class="lane-body">
+      <div class="rail" data-slot="Next.rail">
+        <div class="ver now"><div class="ver-tag">v0 · now</div><div class="ver-what">[what]</div><div class="ver-why">[why not more yet]</div><div class="ver-how">[how]</div></div>
+      </div>
+      <div class="cfoot" data-slot="Next.open"><span class="cf-i">❓</span><span>Open: [questions, each with its role]</span></div>
+    </div>
+  </div>
+  <footer class="brand-foot"><span data-slot="Brand.legal">[Legal line]</span><span>made with 1xops</span></footer>
+  <!-- source of truth for builders: plugin.xlsx (one sheet per role) and the plugin folder; kept in sync by /1xops:overview -->
+</div>
+<script>
+  (function () {
+    var root = document.documentElement, buttons = document.querySelectorAll('[data-theme-choice]');
+    function show(choice) {
+      if (choice) root.dataset.theme = choice; else delete root.dataset.theme;
+      buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)); });
+      try { choice ? localStorage.setItem('plugin-overview-theme', choice) : localStorage.removeItem('plugin-overview-theme'); } catch (e) {}
+    }
+    buttons.forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.themeChoice); }); });
+    show(root.dataset.theme || '');
+  })();
+</script>
+</body>
+</html>
