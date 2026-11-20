@@ -17,6 +17,9 @@
       "Bash(git push:*)",
       "Bash(git merge:*)",
       "Bash(git tag:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
       "Bash(git switch -c:*)",
       "Bash(git checkout -b:*)",
       "Bash(git worktree add:*)",
@@ -71,7 +74,111 @@
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./.secrets)"
+      "Read(./.secrets)",
+      "Read(./tenants/*/.env.secrets)"
     ]
+  },
+  "extraKnownMarketplaces": {
+    "1ops": {
+      "source": {
+        "source": "github",
+        "repo": "nnthanh101/1xops"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
+      }
+    },
+    "agent-toolkit-for-aws": {
+      "source": {
+        "source": "github",
+        "repo": "aws/agent-toolkit-for-aws"
+      }
+    },
+    "shopify-ai-toolkit": {
+      "source": {
+        "source": "github",
+        "repo": "Shopify/Shopify-AI-Toolkit"
+      }
+    },
+    "vercel": {
+      "source": {
+        "source": "github",
+        "repo": "vercel/vercel-plugin"
+      }
+    },
+    "hashicorp": {
+      "source": {
+        "source": "github",
+        "repo": "hashicorp/agent-skills"
+      }
+    },
+    "superpowers-dev": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers"
+      }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    },
+    "anthropic-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills"
+      }
+    },
+    "claude-commerce-agents": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/commerce-agents"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "1xops@1ops": true,
+    "operations@knowledge-work-plugins": true,
+    "cowork-plugin-management@knowledge-work-plugins": true,
+    "customer-support@knowledge-work-plugins": true,
+    "data@knowledge-work-plugins": true,
+    "engineering@knowledge-work-plugins": true,
+    "enterprise-search@knowledge-work-plugins": true,
+    "finance@knowledge-work-plugins": true,
+    "human-resources@knowledge-work-plugins": true,
+    "marketing@knowledge-work-plugins": true,
+    "product-management@knowledge-work-plugins": true,
+    "sales@knowledge-work-plugins": true,
+    "small-business@knowledge-work-plugins": true,
+    "aws-core@agent-toolkit-for-aws": true,
+    "aws-agents@agent-toolkit-for-aws": true,
+    "aws-data-analytics@agent-toolkit-for-aws": true,
+    "aws-startup-advisor@agent-toolkit-for-aws": true,
+    "aws-continuum@agent-toolkit-for-aws": true,
+    "shopify-plugin@shopify-ai-toolkit": true,
+    "vercel-plugin@vercel": true,
+    "terraform@hashicorp": true,
+    "superpowers@superpowers-dev": true,
+    "design@knowledge-work-plugins": true,
+    "legal@knowledge-work-plugins": true,
+    "productivity@knowledge-work-plugins": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "claude-security@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "document-skills@anthropic-agent-skills": true,
+    "commerce-builder@claude-commerce-agents": true
   }
 }

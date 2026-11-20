@@ -3,3 +3,43 @@
 	url = https://github.com/anthropics/knowledge-work-plugins.git
 	branch = main
 	ignore = untracked
+[submodule "upstream/agent-toolkit-for-aws"]
+	path = upstream/agent-toolkit-for-aws
+	url = https://github.com/aws/agent-toolkit-for-aws.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/shopify-ai-toolkit"]
+	path = upstream/shopify-ai-toolkit
+	url = https://github.com/Shopify/Shopify-AI-Toolkit.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/vercel-plugin"]
+	path = upstream/vercel-plugin
+	url = https://github.com/vercel/vercel-plugin.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/hashicorp-agent-skills"]
+	path = upstream/hashicorp-agent-skills
+	url = https://github.com/hashicorp/agent-skills.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/superpowers"]
+	path = upstream/superpowers
+	url = https://github.com/obra/superpowers.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/claude-plugins-official"]
+	path = upstream/claude-plugins-official
+	url = https://github.com/anthropics/claude-plugins-official.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/anthropic-skills"]
+	path = upstream/anthropic-skills
+	url = https://github.com/anthropics/skills.git
+	branch = main
+	ignore = untracked
+[submodule "upstream/commerce-agents"]
+	path = upstream/commerce-agents
+	url = https://github.com/anthropics/commerce-agents.git
+	branch = main
+	ignore = untracked

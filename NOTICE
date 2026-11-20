@@ -22,6 +22,30 @@ Upstream (git submodule, upstream/knowledge-work-plugins; plugins/operations lin
   operations, cowork-plugin-management, customer-support, data, engineering, enterprise-search, finance,
   human-resources, marketing, product-management, sales, small-business.
 
+Upstream library (git submodule, upstream/agent-toolkit-for-aws; never shipped, a source to copy from)
+  agent-toolkit-for-aws    https://github.com/aws/agent-toolkit-for-aws          Apache-2.0
+  Copyright Amazon.com, Inc. or its affiliates. A plugin copied from it keeps this licence and this NOTICE line.
+
+Upstream libraries approved by the maintainer on 2026-11-20 (git submodules under upstream/; never shipped, sources to copy from)
+  Shopify-AI-Toolkit       https://github.com/Shopify/Shopify-AI-Toolkit          MIT          plugins/shopify-plugin
+  vercel-plugin            https://github.com/vercel/vercel-plugin                Apache-2.0   plugins/vercel-plugin
+  Copyright Vercel, Inc.
+  agent-skills             https://github.com/hashicorp/agent-skills              MPL-2.0      plugins/terraform
+  Copyright HashiCorp. MPL-2.0 is file-level copyleft: a copied file stays under MPL-2.0 and its source stays available.
+  superpowers              https://github.com/obra/superpowers                    MIT          plugins/superpowers
+  Copyright Jesse Vincent.
+  claude-plugins-official  https://github.com/anthropics/claude-plugins-official Apache-2.0   12 Anthropic-built plugins linked in plugins/
+  (claude-code-setup, code-review, pr-review-toolkit, security-guidance, claude-security, feature-dev, code-simplifier,
+  claude-md-management, plugin-dev, skill-creator, hookify, frontend-design); partner plugins in it are not linked.
+  skills                   https://github.com/anthropics/skills                   Apache-2.0   upstream/anthropic-skills; enabled through its marketplace, no link in plugins/ (a skill is not a plugin folder)
+  Approved now: document-skills (docx, pdf, pptx, xlsx), each with its own Apache-2.0 LICENSE.txt. A skill copied from it keeps
+  that licence and this NOTICE line. Reviewed 2026-11-20: their scripts make no network or cloud call; they may run pip or npm
+  install for a missing package. The repository's THIRD_PARTY_NOTICES lists FFmpeg (GPL-3.0) for slack-gif-creator only, which is
+  not enabled; do not copy that skill without the owner's yes.
+  commerce-agents          https://github.com/anthropics/commerce-agents         Apache-2.0   plugins/commerce-builder (v0.1.0)
+  A plugin copied from it keeps this licence and NOTICE line. Reviewed 2026-11-20: no MCP server, hook or connector, no cloud
+  call; its commands may clone the reference repository, write project files and run pip or npm installs for the scaffold, after a person's yes. Its sample data is fictional.
+
 Runtime dependencies of the command line (installed from PyPI, not bundled)
   rich 15.0.0              https://github.com/Textualize/rich                     MIT
 
@@ -44,6 +68,12 @@ Container base image: nnthanh101/runbooks cli (Wolfi; AWS CLI v2, Azure CLI, gh)
 its own licence.
 
 Derived code (copied once; no upstream link is kept or tracked)
+  1xops plugin builder skills                                                      Apache-2.0   plugins/1xops/skills/
+    Approved by the maintainer on 2026-11-20 (1XOPS-027). customize-plugin and new-plugin are derived from
+    cowork-plugin-management (https://github.com/anthropics/knowledge-work-plugins, commit e91a134);
+    recommend-setup from claude-code-setup, improve-instructions and capture-learnings from claude-md-management
+    (https://github.com/anthropics/claude-plugins-official, commit 30c0ac7). discover is new. Each folder keeps its
+    Apache-2.0 licence and an UPSTREAM.md with its origin and what 1xops changed.
   Desktop Commander MCP    https://github.com/wonderwhy-er/DesktopCommanderMCP    MIT
     Approved by the maintainer on 2026-11-18. Used in npm "@1xops/command-center" 0.1.0 to
     0.4.2 (derived from version 0.3.3; retired). The 1xops enterprise desktop server is written

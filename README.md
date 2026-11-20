@@ -1,8 +1,8 @@
 # 🥇 ONE 🧰 Cloud & AI Operations ⚙️
 
-**Reduce cloud and AI costs. Automate operational work. Keep your team in control.**
+**Build your own plugin from approved, proven parts. Keep your team in control.**
 
-1xops is a free, open-source toolkit from [OceanSoft.io](https://www.oceansoft.io) for engineering teams on AWS, Azure and AI services. It connects your team's assistant to your cloud accounts and your Jira and Confluence, read-only, in a few minutes, for one person, a team or a whole organisation.
+1xops is a free, open-source toolkit from [OceanSoft.io](https://www.oceansoft.io) that acts as a trusted advisor for your team's assistant. Show it a job your team already does, and it builds your own plugin from approved, tested parts, so your team spends its time on the business result rather than on choosing and wiring tools. It also connects the assistant to your cloud accounts and your Jira and Confluence, read-only, for one person, a team or a whole organisation.
 
 > **Status:** v0.3.1 is published on [PyPI](https://pypi.org/project/1xops/), [npm](https://www.npmjs.com/package/1xops), [Docker Hub](https://hub.docker.com/r/nnthanh101/1xops) and [ghcr.io](https://github.com/users/nnthanh101/packages/container/package/1xops).
 
@@ -10,6 +10,7 @@
 
 | You are | You get |
 |---|---|
+| A team lead | Show the last time you did a job; get your own plugin built from approved parts, with its licence and origin kept and nothing shipped before review |
 | A platform lead | One command sets up the same connections and safeguards for every team, project or person, from one file |
 | An engineer | A check of what is installed and signed in on your machine, with the fix for anything missing |
 | A security or compliance lead | Connections to your cloud accounts and Jira that can read but not change anything, and a preview of every change before it is made |
@@ -45,7 +46,7 @@ uv tool install 1xops     # or: npm install -g 1xops  (Node.js only, no Python)
 1xops setup               # choose connectors; every change is shown before it is written
 ```
 
-Then, in your assistant, run `/1xops:check`. Free and included: `/1xops:tenant-setup` for one settings file per tenant, then `/1xops:change-request`, `/1xops:vendor-review`, `/1xops:process-doc`, `/1xops:capacity-plan` and `/1xops:compliance-tracking`, each drafted for that tenant and filed only after your yes.
+Then, in your assistant, run `/1xops:check`. Free and included, the plugin builder: `/1xops:discover` turns a job you already do into a workflow spec, `/1xops:new-plugin` builds a plugin from it, `/1xops:customize-plugin` makes a catalogue plugin your own, `/1xops:recommend-setup` recommends only approved parts, and `/1xops:improve-instructions` and `/1xops:capture-learnings` keep your project instructions current. The operations playbooks (`/1xops:change-request`, `vendor-review`, `process-doc`, `capacity-plan`, `compliance-tracking`, per tenant) are in the enterprise edition, built with the same builder.
 
 **Upgrade to the enterprise edition:** buy it at [shop.oceansoft.io](https://shop.oceansoft.io), download the bundle from your order, then run `1xops install --edition enterprise --file 1xops-enterprise-x.y.z.tar.gz --yes`. Same `/1xops:*` names, one plugin: the free edition is replaced, nothing to relearn. `1xops doctor` shows the installed edition. It shows each connector as **ready**, **signed out** or **missing**, with the exact fix, and changes nothing. The same check runs on the command line as `1xops doctor`. See [setup](docs/setup.md).
 

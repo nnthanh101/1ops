@@ -53,6 +53,14 @@ jobs:
           for p in plugins/*/; do
             test -f "$p.claude-plugin/plugin.json" || { echo "$p does not resolve: submodule or upstream moved it"; exit 1; }
           done
+      - name: Only reviewed folders ship, never a library link
+        run: |
+          for s in $(jq -r '.plugins[].source' .claude-plugin/marketplace.json); do
+            p=${s#./}
+            if [ -L "$p" ] || [ ! -d "$p" ]; then
+              echo "$p is listed in marketplace.json but is a library link or missing: copy and review it first (plugins/README.md)"; exit 1
+            fi
+          done
 
   test-python:
     name: "Test: Python"

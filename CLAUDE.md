@@ -11,10 +11,38 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 - Settings live in `.env.1xops` (non-secret `KEY=value`; secret-looking keys are refused). Guided setup: `1xops setup`.
 - Dependencies: latest stable, official only. A new third party needs the owner's yes and a line in `NOTICE`.
 
+## The product: build your own plugin from proven free parts
+- Customers build a plugin from proven, free, open-source plugins of trusted vendors. They can only do that when every
+  part is in one visible place, so `plugins/` is the catalogue: a link to each plugin **the owner selected** from each
+  `upstream/<vendor>/` submodule (pinned, never shipped: `knowledge-work-plugins`, `agent-toolkit-for-aws`; next Shopify,
+  Vercel, Azure…), beside the plugins we build. The owner selects; a session never adds or removes a catalogue link on
+  its own (partner-built plugins are not selected). Never move the catalogue out of `plugins/`, never
+  narrow it to "only 1xops". A new vendor = a submodule in `upstream/` + one link per selected plugin (vendor prefix if names clash).
+- **1xops is the worked example**, one target built from the same catalogue a customer uses; building it proves the DIY
+  path end to end. Each customer builds their own 1xops-like plugin the same way, with the same parts and steps: copy a
+  library plugin once into its own folder, rename it into its namespace, keep its licence and NOTICE line, review
+  every skill or server that can change things. Tools: the free plugin itself is the builder (`/1xops:discover`,
+  `new-plugin`, `customize-plugin` with `scripts/fork.sh`); `1xops plugin new` on the command line later.
+- **Free 1xops is the DIY builder and trusted advisor; operations playbooks are paid.** It recommends only approved,
+  tested settings, plugins and official components so the customer focuses on business value. OceanSoft is its first
+  customer: the enterprise plugin (`1xops-enterprise/plugins/1xops`) is built with it, from proven free plugins plus
+  repeatable workflows, judged on buyer urgency and measurable value, differentiation, fit and feasibility,
+  willingness to pay and recurring value, and expansion.
+- **Shipping is controlled in one file.** Links in `plugins/` never ship; only entries in
+  `.claude-plugin/marketplace.json` do, and only reviewed folders (CI refuses a link).
+- **Free vs paid.** This open-source repository demonstrates how a one-off DIY plugin is built from trusted vendors'
+  free plugins (working names: 1ops & 1xops DIY plugins). Advanced capabilities and high-business-value template
+  plugins are built the same way and sold by oceansoft.io (enterprise edition), never added here.
+- Guide: `plugins/README.md`; decision: `docs/adr/0001-distribution.md`.
+
 ## How to work
 - `task` lists everything; logic lives in `scripts/`, decisions in `docs/adr/`. Add code only with a named business purpose.
 - Local first: run `task gate` (lint, tests, act, image, UX proof, as CI and a customer will) before saying done or asking for a commit.
-- Git: work on `feature/*` in its own worktree (`git worktree add ../1ops-<slug> -b feature/<slug>`), never by
+- Deliverables live in `~/Projects/1xops`, tracked by Git, on `develop`. A doc, rule, README or link the owner asks for is
+  written there directly and committed; never in a sibling folder. Only code that needs `task gate` uses a worktree.
+- End state first: before changing files or folders, say in one line what will exist when done (`~/Projects` holds one
+  folder per repo: `1xops`, `1xops-enterprise`, `command-center`); at the end run `ls ~/Projects` and show it matches.
+- Git: code works on `feature/*` in its own worktree inside the repo (`git worktree add .claude/worktrees/<slug> -b feature/<slug>`, git-ignored; never a new folder in `~/Projects`), never by
   switching the owner's checkout; prove it with `task gate`, stage it on `develop` (`git merge --squash`),
   delete the branch and the worktree. The session commits and releases, but first asks the owner one question with
   scored options, each with its business value (version, now or hold); on yes it runs `task release STORY=n` end to end, then
@@ -25,8 +53,10 @@ Owner and only IP holder: nnthanh101 | oceansoft.io. Public prose (README, docs,
 
 ## Commands: one namespace
 Every command and skill is `/1xops:<name>`, free or enterprise; `<name>` is the outcome in kebab-case, never the edition,
-vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` and the skills `tenant-setup`, `change-request`, `vendor-review`, `process-doc`,
-`capacity-plan`, `compliance-tracking`. The enterprise edition carries these unchanged, plus everything else, in the same-named
+vendor or version; a shipped name never changes meaning. Free (this repository): `/1xops:check` and the builder skills `discover`, `new-plugin`, `customize-plugin`,
+`recommend-setup`, `improve-instructions`, `capture-learnings`. The enterprise edition carries these unchanged, plus the
+operations playbooks (`tenant-setup`, `change-request`, `vendor-review`, `process-doc`, `capacity-plan`,
+`compliance-tracking`, moved from free on 2026-11-20 with their names unchanged) and everything else, in the same-named
 `1xops` plugin in the private `1xOps/1xops-enterprise` repository. Marketplaces: free `1ops` (`1xops@1ops`), enterprise `1xops` (`1xops@1xops`). Table: `plugins/1xops/README.md`.
 
 ## Release standard
@@ -56,7 +86,7 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 - **Tasks `TASK-NNN`** are broken out just in time: tick boxes in the story until it moves to Ready, then sub-issues (type Task).
 - Tags: one `type:`, one `edition:`, one `cap:`, plus `cloud:` when it applies; one milestone per release; free stories on board 15, premium on board 11.
 - **Scaffold, not text.** 5W1H, why, what-if, LEAN/5S/3T, INVEST and the audience check (CEO, CTO, CFO, CDO, CSO; the owner as accountable approver) are the session's checklist for covering every angle. Use them in reasoning and coordination; never write them into issues, the README or docs.
-- Skill: `invest-story` (1ops-enterprise `.claude/skills`).
+- Skill: `invest-story` (1xops-enterprise `.claude/skills`).
 
 ## Mistakes already made here. Do not repeat them
 | Mistake | Rule |
@@ -67,7 +97,7 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | An issue closed by `Closes #13` with criteria unproven | `Refs #N`; proof on the published artifact first |
 | A Dockerfile written from scratch on `python:3.14-slim` (386 MB, unpinned, unlocked) | Reuse the owner's platform images and their conventions first; measure before and after |
 | `1xops doctor` (17 Nov 2026) found the default Azure login on the owner's Mac can change things | Sessions never use the owner's own cloud login; read-only identity only, checked with `1xops doctor` first |
-| 0.2.4 shipped a misaligned table header; a literal `[bold]…[/]`, rows wrapped at 80 columns and 65 profiles listed twice reached the wizard. All 50 unit tests passed | A change to what a person sees is done only when seen: `task ux` (real terminal, clean container, checks + screenshots) passes, and the screenshots are looked at. Skill `visual-verify` (1ops-enterprise) |
+| 0.2.4 shipped a misaligned table header; a literal `[bold]…[/]`, rows wrapped at 80 columns and 65 profiles listed twice reached the wizard. All 50 unit tests passed | A change to what a person sees is done only when seen: `task ux` (real terminal, clean container, checks + screenshots) passes, and the screenshots are looked at. Skill `visual-verify` (1xops-enterprise) |
 | `rich` was removed to make stdout byte-identical, which cost the customer the UX | Byte-identical means the files and piped output. On a terminal, Python uses `rich` to the full (tables, colour, spinner, prompts) and Node.js draws the same natively |
 | Release proof reported registry lag as a product failure, twice | The proof waits for the files an install fetches and retries a channel that printed nothing; it still fails a version that does not exist |
 | A pty capture rendered to SVG was shown as a terminal screenshot | Say what it is. A real screenshot is `screencapture -l` of a Terminal.app or iTerm2 window; without Screen Recording permission, ask the owner to grant it or take it |
@@ -90,3 +120,9 @@ First ask what the change ships through: a plugin file, a test or a workflow shi
 | A release was bumped to 0.4.0 because a command was added; the owner wanted 0.3.2, and the tag had to be removed after the merge | A patch by default; the version is one of the scored options in the release question, asked before the release starts |
 | SSO tiles were reported as passing from clicks with a session already open; two of them (GitHub, Slack) were not SSO at all, and the tenant's status page, which already said so, was not read first | Read the tenant's status page first; a sign-in is ✅ only after a clean test (signed out, then launched); on a failure read the identity provider's sign-in log; report ✅ / 🔑 / 🛠️ / ⏳, without alarm |
 | A connector catalogue was called done while the README the owner named was not synced; a requested doc was hidden in a sibling worktree | Done means every named target is synced, with one status page per tenant and the rest linking to it; a requested doc goes in the owner's checkout. Give the full path and its git state |
+| The catalogue was changed without the owner: 5 partner-built plugins, bio-research and pdf-viewer were linked though never picked (all removed) | The owner selects the catalogue; a session proposes a link change and makes it only on a yes, and removes only what was named |
+| The DIY rule and README were edited in `../1ops-diy-rule`, a sibling worktree, again after the same lesson | Requested docs, rules and links are written in `~/Projects/1xops` on `develop` and committed; a worktree is only for code that needs the gate |
+| "Customers see only 1xops" was read as "remove the catalogue": all 21 upstream links were deleted from `plugins/` (e68c14e) and had to be reverted | The product is DIY from one visible catalogue; 1xops is its worked example. Keep every link; `marketplace.json`, not the folder, decides what ships. When a request seems to narrow the model, ask before deleting |
+| A folder cleanup created a new sibling worktree (`~/Projects/1xops-enterprise-cc`) without saying so | Worktrees live in `.claude/worktrees/<slug>` inside the repo; say before creating one and remove it in the same session; check `ls ~/Projects` against the end state |
+| `mv` commands handed to the owner reused a folder name; running one again sent the real `command-center` repo to the Trash | A command handed to the owner checks what it acts on (`git remote get-url origin`) before moving it, so running it twice does nothing; never reuse a name in the same set |
+| A one-line reply was taken as approval to fold a public Apache-2.0 npm product into the private enterprise repo | A change that crosses public/private, licence or publishing lines gets one question with its costs, and waits for the answer; small reversible steps are just done |
