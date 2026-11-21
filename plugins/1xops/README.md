@@ -27,7 +27,7 @@ One namespace for free and enterprise: every command and skill is `/1xops:<name>
 | `/1xops:recommend-setup` (skill) | Recommends settings, plugins and connectors only from what the project approved, each marked tested, approved or not approved; changes nothing | Free |
 | `/1xops:improve-instructions` (skill) | Scores the project's instructions and proposes short fixes, applied after a yes | Free |
 | `/1xops:capture-learnings` (skill) | Turns what a session learned into one-line instruction updates, applied after a yes | Free |
-| `/1xops:overview` (skill) | One page for leadership (`plugin-overview.html`: what it does, what it is built from, who approves what, what is proven, what is next; light and dark, phone and print), kept in sync with the workbook (each change shown, applied after a yes); closes a session with a recap | Free |
+| `/1xops:overview` (skill) | One page for leadership (`plugin-overview.html`: what it does, what it costs to run, what it is built from, who approves what and how each yes is enforced, how people and the assistant sign in to each connector, what each part can use and who hands work to whom, what is proven, what is next; light and dark, phone and print), kept in sync with the workbook (each change shown, applied after a yes); closes a session with a recap | Free |
 | `/1xops:tenant-setup`, `change-request`, `vendor-review`, `process-doc`, `capacity-plan`, `compliance-tracking` (skills) | Operations playbooks per tenant, built with the free builder | Enterprise |
 | `/1xops:cost-check` | Top AWS and Azure savings, each with \$/month and its source | Enterprise |
 | `/1xops:ai-spend` | AI spend by team, vendor, and seat vs API | Enterprise |

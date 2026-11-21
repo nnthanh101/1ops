@@ -43,6 +43,7 @@ Keep the conversation in plain language: what the plugin will do, not file paths
 
    - Start with one skill per job.
    - Add agents or hooks only when the person asks and the spec needs them. A hook runs without being asked, so it needs the administrator's yes.
+   - A team of agents fits when the spec has jobs a reviewer judges separately, for example collecting evidence and checking dependencies. The lead is the command the person runs; it hands each job to one agent and keeps the decision with a named person. Then rejected results and model cost can be counted per agent. Leave runs of many helpers off unless the volume needs them, and say why.
    - Get a yes before building.
 4. **Design.**
    - Each skill:
@@ -67,13 +68,15 @@ Create, in this order:
    - A third-person description with real trigger phrases.
    - Each operation states its permission from the spec. Anything above "read" waits for a person's yes, and names the approver.
    - Each finding names its source. The skill never presents an estimate as a measured figure.
-3. `.mcp.json`, only for approved connectors from the spec:
+3. `agents/<role>.md` for each agent in the plan: a `description` with when to hand it work, and a `tools` list with only what its job needs (built-in tools and the approved connectors' tools). An agent with no `tools` list inherits every tool. An agent never gets a tool that writes to a system the spec keeps read-only. In a skill or command, `allowed-tools` lets those tools run without asking, so list only read tools there and leave anything that changes things out, so the host asks first; use `disallowed-tools` for a tool the job must never use.
+4. `references/agent-rules.md` and the workbook's hidden `_agents` sheet, one row per part: its purpose, why it is there, what happens if it is missing, its business value, the critical-thinking check and the mental model it applies. Agents read it before they act; it never goes into the README or the page.
+5. `.mcp.json`, only for approved connectors from the spec:
    - Use `${VAR}` for every credential or host-specific value.
    - Never write a secret into a file.
    - Use HTTPS for remote servers.
-4. `evals/<case>/`: one folder per case from the spec's `evals/` (accepted, dismissed and the replay set), in the format `claude plugin eval` runs: `prompt.md` and `graders/` (a `regex` or `file_exists` grader where the answer is exact, an `llm` grader with the expected result otherwise). They are the plugin's first test.
-5. `README.md`: what it does, who approves what, the connectors and how to sign in, and what has not been proven yet.
-6. `UPSTREAM.md`, when any part was copied from the catalogue: the origin and the review list (see `/1xops:customize-plugin`).
+6. `evals/<case>/`: one folder per case from the spec's `evals/` (accepted, dismissed and the replay set), in the format `claude plugin eval` runs: `prompt.md` and `graders/` (a `regex` or `file_exists` grader where the answer is exact, an `llm` grader with the expected result otherwise). They are the plugin's first test.
+7. `README.md`: what it does, who approves what, the connectors and how to sign in, and what has not been proven yet.
+8. `UPSTREAM.md`, when any part was copied from the catalogue: the origin and the review list (see `/1xops:customize-plugin`).
 
 Reference material:
 - `references/component-schemas.md`: exact formats of skills, agents, hooks, connectors and commands

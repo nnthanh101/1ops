@@ -91,6 +91,10 @@ Use the words the teams already use in their documents. A name never carries the
     - Delete the example rows, and leave an unanswered field empty with its role under Next → Open question.
     - Each sheet holds one Excel table. After you add rows, extend that table's range to the last filled row and keep its columns as they are, so Excel opens the file without a repair prompt.
     - Write a `_sync` row (sheet, ID or field, fingerprint) for every fact you fill, not only the thresholds, so `/1xops:overview` sees any later edit.
+    - Integrations: for each connector, fill how people sign in, how the assistant signs in and when it is available from the project's `CONNECTORS.md` when there is one (copy its status symbol: ✅ 🔑 🛠️ ⏳ ➖), and Ready now from `1xops doctor --brief`. Never guess a status.
+    - Access: fill Enforced by for each operation (an ask rule, a tools list, the host's prompt or a read-only identity). Write "written only" when nothing enforces it, and list it under Next → Open question for the administrator.
+    - Job: fill Who it serves, Win, when it works, and Risk, if it is not done, in the owner's words; leave them empty for the business owner rather than guess.
+    - The hidden `_agents` sheet is for agents and builders: one row per planned part with its purpose, why it is there, what happens if it is missing, its business value, the critical-thinking check and the mental model it applies. Never copy these labels into the spec's prose for the owner.
     - Use the `xlsx` skill if it is available. Otherwise use Python with openpyxl.
     - If neither is available, write the spec only and say that the workbook needs the `xlsx` skill.
   - The workbook is where each role edits its own decisions; `/1xops:overview` keeps it and the plugin in sync.
